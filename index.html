@@ -3,1083 +3,1444 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Surat - Pemerintah Desa Fajar Asri</title>
-    
+    <title>Sistem Layanan Administrasi Desa</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SweetAlert2 for Alerts -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- html2pdf for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- Chart.js untuk Grafik Dashboard -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!-- SheetJS (Excel) & jsPDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
-    
-    <!-- LocalForage (Untuk cache lokal & Offline) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
         
-        @media print {
-            body * { visibility: hidden; }
-            #print-area, #print-area * { visibility: visible; }
-            #print-area { position: absolute; left: 0; top: 0; width: 100%; border: none !important; box-shadow: none !important; padding: 10px !important; margin: 0 !important; }
-            .no-print, .no-print * { display: none !important; }
-            
-            /* Mengakali tabel agar tidak terpotong pada kertas A4 */
-            .overflow-x-auto { overflow: visible !important; }
-            table { width: 100% !important; min-width: 100% !important; border-collapse: collapse !important; }
-            table th, table td { font-size: 11px !important; padding: 6px !important; border-bottom: 1px solid #333 !important; word-wrap: break-word; color: #000 !important; }
-            table tr { page-break-inside: avoid; page-break-after: auto; }
-            table thead { display: table-header-group; background-color: #f8fafc !important; }
-            table thead th { border-bottom: 2px solid #000 !important; font-weight: bold; }
-            
-            /* Memaksa background color tampil di hasil cetak */
-            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .print-only { display: none; }
+        
+        /* Pengaturan Kertas Default agar langsung terdeteksi LEGAL oleh Printer */
+        @page {
+            size: legal portrait;
+            margin: 0;
         }
 
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        @media print {
+            body > *:not(#print-area) { display: none !important; }
+            body { margin: 0; padding: 0; background-color: #fff; }
+            
+            #print-area { 
+                display: block !important;
+                position: static !important; 
+                width: 100% !important; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                background: white !important; 
+            }
+            
+            #print-area .a4-paper {
+                width: 215.9mm !important; /* Ukuran lebar Legal */
+                min-height: 355.6mm !important; /* Ukuran tinggi Legal */
+                padding: 15mm !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                box-sizing: border-box;
+                page-break-after: always;
+            }
 
-        .view-section { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            .no-print { display: none !important; }
+            .print-only { display: block; }
+            
+            .draggable-element, .draggable-element:hover { border: none !important; resize: none !important; }
+        }
+
+        /* Legal Size styling for Preview and PDF (renamed class functionally, kept name for compatibility) */
+        .a4-paper {
+            width: 215.9mm; /* Lebar Kertas Legal */
+            min-height: 355.6mm; /* Tinggi Kertas Legal */
+            padding: 18mm;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            position: relative;
+            box-sizing: border-box;
         }
         
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #4f46e5;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
+        .kop-surat { display: flex; align-items: center; justify-content: center; border-bottom: 3px solid black; padding-bottom: 8px; margin-bottom: 10px; }
+        .kop-surat-logo { width: 75px; height: auto; flex-shrink: 0; margin-right: 15px; }
+        .kop-surat-text { flex: 1; text-align: center; }
+        
+        .kop-surat-text h1 { font-size: 13pt; font-weight: bold; margin: 0; text-transform: uppercase; }
+        .kop-surat-text h2 { font-size: 11pt; font-weight: bold; margin: 0; text-transform: uppercase; }
+        .kop-surat-text h3 { font-size: 12pt; font-weight: bold; margin: 0; text-transform: uppercase; }
+        .kop-surat-text p { font-size: 8.5pt; margin: 0; }
+
+        /* Kompak agar muat di 1 halaman A4 */
+        .isi-surat { font-size: 10.5pt; line-height: 1.15; text-align: justify; }
+        .isi-surat p { margin: 3px 0; }
+        .isi-surat table td { padding: 1px 0; }
+        
+        /* Draggable & Resizable Elements (Stempel & TTD) */
+        .draggable-element {
+            position: absolute;
+            cursor: move;
+            z-index: 10;
+            resize: both;
+            overflow: hidden;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .draggable-element img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+        .draggable-element:hover { border: 1px dashed #000; }
+        #pdf-export-wrapper .draggable-element { border: none !important; resize: none !important; }
+        
+        /* MODIFIKASI: Area Tanda Tangan diperlebar dan jarak vertikal (spasi) diperluas kebawah secara signifikan agar sangat leluasa untuk ttd basah & stempel */
+        .ttd-area { float: right; text-align: center; margin-top: 15px; margin-right: 10px; margin-bottom: 80px; width: 400px; position: relative; }
+        .ttd-area p { margin: 2px 0; z-index: 1; position: relative;}
+        /* Spasi kosong vertikal diatur secara dinamis via inline-style dari pengaturan */
+        .ttd-name { font-weight: bold; text-decoration: underline; z-index: 1; position: relative; }
     </style>
 </head>
-<body class="text-gray-800 antialiased flex h-screen overflow-hidden relative">
+<body class="text-gray-800 h-screen flex overflow-hidden">
 
-    <!-- Mobile Sidebar Backdrop -->
-    <div id="sidebar-backdrop" class="fixed inset-0 bg-gray-900/50 z-40 hidden md:hidden transition-opacity" onclick="toggleSidebar()"></div>
-
-    <aside id="sidebar" class="bg-indigo-800 text-white w-64 flex-shrink-0 hidden md:flex flex-col transition-all duration-300 no-print shadow-xl z-50">
-        <div class="h-20 flex items-center justify-between border-b border-indigo-700 px-4">
-            <h1 class="text-lg font-bold tracking-wide leading-tight flex-1 text-center"><i class="fa-solid fa-envelope-open-text mr-2"></i> Desa Fajar Asri</h1>
-            <!-- Tombol Sembunyi khusus Mobile -->
-            <button onclick="toggleSidebar()" class="md:hidden text-indigo-300 hover:text-white p-1 rounded-lg bg-indigo-900 hover:bg-indigo-700 transition" title="Tutup Menu">
-                <i class="fa-solid fa-xmark text-xl px-1"></i>
-            </button>
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-50 hidden">
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md transform transition-all">
+            <div class="text-center mb-6">
+                <div id="login-logo-container">
+                    <i class="ph-fill ph-buildings text-5xl text-blue-600 mb-2" id="login-icon"></i>
+                    <img id="login-logo-img" src="" class="h-16 mx-auto mb-2 hidden object-contain">
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800">DESA FAJAR ASRI</h2>
+                <p class="text-sm text-gray-500">Sistem Administrasi Desa</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Username</label>
+                    <input type="text" id="username" required class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="password" required class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="flex items-center">
+                    <input id="remember-me" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="remember-me" class="ml-2 block text-sm text-gray-700">Ingat Saya</label>
+                </div>
+                <button type="submit" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Masuk
+                </button>
+            </form>
         </div>
-        <nav class="flex-1 overflow-y-auto py-4">
-            <ul class="space-y-2 px-4">
-                <li>
-                    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full text-left px-4 py-3 rounded-lg bg-indigo-900 border-l-4 border-white transition-colors flex items-center">
-                        <i class="fa-solid fa-chart-pie w-6"></i> Dashboard
-                    </button>
-                </li>
-                <li>
-                    <button onclick="switchTab('masuk')" id="nav-masuk" class="w-full text-left px-4 py-3 rounded-lg hover:bg-indigo-700 transition-colors flex items-center">
-                        <i class="fa-solid fa-inbox w-6"></i> Surat Masuk
-                    </button>
-                </li>
-                <li>
-                    <button onclick="switchTab('keluar')" id="nav-keluar" class="w-full text-left px-4 py-3 rounded-lg hover:bg-indigo-700 transition-colors flex items-center">
-                        <i class="fa-solid fa-paper-plane w-6"></i> Surat Keluar
-                    </button>
-                </li>
-            </ul>
-        </nav>
-        <div class="p-4 border-t border-indigo-700 text-xs text-center">
-            <div id="connection-status" class="inline-flex items-center justify-center w-full gap-1 text-green-300 bg-indigo-900 px-3 py-2 rounded-lg mb-2 border border-green-500/30">
-                <i class="fa-solid fa-circle-notch fa-spin"></i> Menghubungkan...
+    </div>
+
+    <!-- MAIN APP LAYOUT (Sidebar + Content) -->
+    <div id="app-layout" class="flex w-full h-full hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-gray-800 text-white flex flex-col transition-all duration-300 z-20">
+            <div class="h-16 flex items-center px-6 bg-gray-900 border-b border-gray-700">
+                <div id="sidebar-logo-container" class="mr-2">
+                    <i class="ph-fill ph-buildings text-2xl text-blue-400" id="sidebar-icon"></i>
+                    <img id="sidebar-logo-img" src="" class="h-8 w-8 hidden object-contain rounded">
+                </div>
+                <span class="text-md font-bold">DESA FAJAR ASRI</span>
             </div>
-            <button onclick="forceSync()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs transition border border-indigo-500">
-                <i class="fa-solid fa-rotate mr-1"></i> Sinkronisasi Manual
-            </button>
-        </div>
-    </aside>
-
-    <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <header class="h-16 bg-white shadow-sm flex items-center justify-between px-6 no-print z-10">
-            <div class="flex items-center">
-                <button onclick="toggleSidebar()" class="text-gray-500 hover:text-indigo-600 mr-4 p-2 rounded-lg hover:bg-indigo-50 transition" title="Sembunyikan/Tampilkan Menu">
-                    <i class="fa-solid fa-ellipsis-vertical text-xl px-1"></i>
-                </button>
-                <h2 id="page-title" class="text-lg md:text-xl font-semibold text-gray-800">Dashboard</h2>
+            <div class="p-4 flex items-center space-x-3 border-b border-gray-700">
+                <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold" id="user-avatar">A</div>
+                <div>
+                    <p class="text-sm font-medium" id="user-name-display">Admin</p>
+                    <p class="text-xs text-blue-300" id="user-role-display">Administrator</p>
+                </div>
             </div>
-            <div class="flex items-center gap-2 md:gap-3">
-                <!-- FITUR FILTER TAHUN -->
-                <div class="flex items-center gap-2 border-r pr-2 md:pr-3 border-gray-200">
-                    <i class="fa-regular fa-calendar text-gray-500 hidden md:block"></i>
-                    <select id="year-filter" onchange="changeYear(this.value)" class="bg-gray-50 border border-gray-300 text-gray-900 text-xs md:text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block py-1.5 px-2 outline-none transition cursor-pointer max-w-[100px] md:max-w-none">
-                        <option value="all">Semua Tahun</option>
-                    </select>
-                </div>
-
-                <!-- FITUR FILTER BULAN -->
-                <div class="flex items-center gap-2 border-r pr-2 md:pr-3 border-gray-200">
-                    <select id="month-filter" onchange="changeMonth(this.value)" class="bg-gray-50 border border-gray-300 text-gray-900 text-xs md:text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block py-1.5 px-2 outline-none transition cursor-pointer max-w-[100px] md:max-w-none">
-                        <option value="all">Semua Bulan</option>
-                        <option value="01">Januari</option>
-                        <option value="02">Februari</option>
-                        <option value="03">Maret</option>
-                        <option value="04">April</option>
-                        <option value="05">Mei</option>
-                        <option value="06">Juni</option>
-                        <option value="07">Juli</option>
-                        <option value="08">Agustus</option>
-                        <option value="09">September</option>
-                        <option value="10">Oktober</option>
-                        <option value="11">November</option>
-                        <option value="12">Desember</option>
-                    </select>
-                </div>
-
-                <div id="queue-badge" class="hidden items-center justify-center bg-red-100 text-red-700 px-3 py-1.5 rounded-full text-xs font-bold border border-red-200">
-                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i> <span id="queue-count">0</span> <span class="hidden md:inline ml-1">Antrean</span>
-                </div>
-                <button onclick="fetchDataFromServer()" class="bg-blue-50 hover:bg-blue-100 text-blue-700 p-2 md:px-4 md:py-2 rounded-full text-sm font-medium border border-blue-200 transition" title="Muat Ulang Data">
-                    <i class="fa-solid fa-arrows-rotate md:mr-1"></i> <span class="hidden md:inline">Muat Ulang</span>
+            <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+                <a href="#" onclick="switchView('dashboard')" class="nav-item flex items-center px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white" data-target="dashboard">
+                    <i class="ph ph-squares-four text-xl mr-3"></i> Dashboard
+                </a>
+                <a href="#" onclick="switchView('surat')" class="nav-item flex items-center px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white" data-target="surat">
+                    <i class="ph ph-file-text text-xl mr-3"></i> Data Surat
+                </a>
+                <a href="#" id="menu-akun" onclick="switchView('akun')" class="nav-item flex items-center px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white" data-target="akun">
+                    <i class="ph ph-users text-xl mr-3"></i> Kelola Akun
+                </a>
+                <a href="#" id="menu-pengaturan" onclick="switchView('pengaturan')" class="nav-item flex items-center px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white" data-target="pengaturan">
+                    <i class="ph ph-gear text-xl mr-3"></i> Pengaturan
+                </a>
+            </nav>
+            <div class="p-4 border-t border-gray-700">
+                <button onclick="logout()" class="flex items-center w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors">
+                    <i class="ph ph-sign-out text-xl mr-2"></i> Keluar
                 </button>
             </div>
-        </header>
+        </aside>
 
-        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 md:p-6" id="main-content">
-            
-            <div id="view-dashboard" class="view-section space-y-6">
-                <div class="bg-gradient-to-r from-indigo-600 to-blue-600 p-6 rounded-xl shadow-md text-white">
-                    <h3 class="text-xl font-bold mb-2">Sistem E-Surat Pemerintah Desa Fajar Asri <i class="fa-solid fa-cloud-check ml-1"></i></h3>
-                    <p class="text-indigo-100 text-sm md:text-base opacity-90 max-w-3xl">
-                        Aplikasi ini dirancang untuk pencatatan mandiri (offline-first). Jika dikonfigurasi dengan Google Apps Script, data akan tersimpan dan sinkron secara otomatis.
-                    </p>
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col h-full bg-gray-100 overflow-hidden relative">
+            <!-- Topbar -->
+            <header class="h-16 bg-white shadow-sm flex items-center justify-between px-6 z-10">
+                <h1 class="text-xl font-semibold text-gray-800" id="page-title">Dashboard</h1>
+                <div class="flex items-center space-x-4">
+                    <span id="sync-status" class="text-sm text-gray-500 flex items-center">
+                        <i class="ph-fill ph-cloud-check text-green-500 mr-1 text-lg"></i> Tersinkronisasi
+                    </span>
+                    <button onclick="syncData()" class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md text-sm font-medium hover:bg-blue-100 flex items-center transition-colors">
+                        <i class="ph ph-arrows-clockwise mr-1"></i> Sinkron Manual
+                    </button>
                 </div>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6 h-full">
-                        <div class="bg-white rounded-xl shadow-sm p-6 flex flex-col justify-center border-l-4 border-blue-500 cursor-pointer hover:shadow-md transition transform hover:-translate-y-1" onclick="switchTab('masuk')">
-                            <div class="flex items-center mb-4">
-                                <div class="p-3 rounded-full bg-blue-50 text-blue-500 mr-4">
-                                    <i class="fa-solid fa-inbox text-2xl"></i>
-                                </div>
-                                <h4 class="text-sm text-gray-500 font-bold uppercase tracking-wide">Total Surat Masuk</h4>
-                            </div>
-                            <p id="count-masuk" class="text-5xl font-black text-gray-800 ml-2">0</p>
-                        </div>
-                        <div class="bg-white rounded-xl shadow-sm p-6 flex flex-col justify-center border-l-4 border-green-500 cursor-pointer hover:shadow-md transition transform hover:-translate-y-1" onclick="switchTab('keluar')">
-                            <div class="flex items-center mb-4">
-                                <div class="p-3 rounded-full bg-green-50 text-green-500 mr-4">
-                                    <i class="fa-solid fa-paper-plane text-2xl"></i>
-                                </div>
-                                <h4 class="text-sm text-gray-500 font-bold uppercase tracking-wide">Total Surat Keluar</h4>
-                            </div>
-                            <p id="count-keluar" class="text-5xl font-black text-gray-800 ml-2">0</p>
-                        </div>
-                    </div>
+            </header>
 
-                    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col items-center justify-center">
-                        <h4 class="text-sm text-gray-500 font-bold uppercase tracking-wide mb-4 w-full text-center border-b border-gray-100 pb-2">Distribusi Arsip</h4>
-                        <div class="relative w-full max-w-[200px] aspect-square flex items-center justify-center">
-                            <canvas id="suratChart"></canvas>
-                            <div id="chart-empty-text" class="absolute inset-0 flex items-center justify-center text-xs text-gray-400 font-medium text-center hidden">
-                                Belum ada data
+            <!-- Scrollable Content -->
+            <div class="flex-1 overflow-auto p-6">
+                <div id="view-dashboard" class="view-section space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+                        <div onclick="filterSurat('')" class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500 cursor-pointer hover:bg-blue-50 transform hover:-translate-y-1 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div><p class="text-sm font-medium text-gray-500">Semua Surat</p><p class="text-3xl font-bold text-gray-800 mt-2" id="stat-total">0</p></div>
+                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600"><i class="ph-fill ph-files text-2xl"></i></div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="view-data" class="view-section hidden space-y-6">
-                <div class="bg-white p-4 rounded-xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 border border-gray-100 no-print">
-                    <div class="flex w-full md:w-auto gap-2">
-                        <button onclick="openForm()" class="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-md flex justify-center items-center">
-                            <i class="fa-solid fa-plus mr-2"></i> Tambah Surat
-                        </button>
-                    </div>
-                    <div class="flex flex-wrap w-full md:w-auto gap-2">
-                        <button onclick="window.print()" class="flex-1 md:flex-none bg-gray-800 hover:bg-gray-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition shadow-md flex justify-center items-center">
-                            <i class="fa-solid fa-print mr-2"></i> Print Kertas
-                        </button>
-                        <button onclick="exportExcel()" class="flex-1 md:flex-none bg-green-50 hover:bg-green-100 text-green-700 px-4 py-2 rounded-lg text-sm font-medium transition border border-green-200 shadow-sm">
-                            <i class="fa-solid fa-file-excel mr-1"></i> Excel
-                        </button>
-                        <button onclick="exportPDF()" class="flex-1 md:flex-none bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm font-medium transition border border-red-200 shadow-sm">
-                            <i class="fa-solid fa-file-pdf mr-1"></i> PDF
-                        </button>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100" id="print-area">
-                    <div class="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center rounded-t-xl">
-                        <h3 id="table-title" class="text-lg font-bold text-gray-800">Daftar Surat</h3>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse min-w-[800px]" id="data-table">
-                            <thead id="table-head"></thead>
-                            <tbody id="table-body" class="divide-y divide-gray-100 text-sm"></tbody>
-                        </table>
-                    </div>
-                    <div id="empty-state" class="hidden p-16 text-center text-gray-500">
-                        <div class="bg-indigo-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 border border-indigo-100">
-                            <i class="fa-solid fa-folder-open text-4xl text-indigo-300"></i>
+                        <div onclick="filterSurat('Surat Keterangan Usaha (SKU)')" class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-500 cursor-pointer hover:bg-green-50 transform hover:-translate-y-1 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div><p class="text-sm font-medium text-gray-500">SK Usaha</p><p class="text-2xl font-bold text-gray-800 mt-2" id="stat-sku">0</p></div>
+                                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600"><i class="ph-fill ph-storefront text-xl"></i></div>
+                            </div>
                         </div>
-                        <p class="font-bold text-gray-700 text-lg">Belum Ada Data Tersimpan</p>
-                        <p class="text-sm mt-1 text-gray-500 max-w-sm mx-auto">Untuk filter waktu terpilih, atau data memang masih kosong.</p>
+                        <div onclick="filterSurat('Surat Keterangan Tidak Mampu (SKTM)')" class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-yellow-500 cursor-pointer hover:bg-yellow-50 transform hover:-translate-y-1 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div><p class="text-sm font-medium text-gray-500">SKTM</p><p class="text-2xl font-bold text-gray-800 mt-2" id="stat-sktm">0</p></div>
+                                <div class="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600"><i class="ph-fill ph-hands-praying text-xl"></i></div>
+                            </div>
+                        </div>
+                        <div onclick="filterSurat('Surat Keterangan Kematian')" class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-gray-500 cursor-pointer hover:bg-gray-100 transform hover:-translate-y-1 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div><p class="text-sm font-medium text-gray-500">SK Kematian</p><p class="text-2xl font-bold text-gray-800 mt-2" id="stat-kematian">0</p></div>
+                                <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600"><i class="ph-fill ph-coffin text-xl"></i></div>
+                            </div>
+                        </div>
+                        <div onclick="filterSurat('Surat Keterangan Pindah Domisili')" class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-cyan-500 cursor-pointer hover:bg-cyan-50 transform hover:-translate-y-1 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div><p class="text-sm font-medium text-gray-500">SK Pindah Domisili</p><p class="text-2xl font-bold text-gray-800 mt-2" id="stat-pindah">0</p></div>
+                                <div class="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center text-cyan-600"><i class="ph-fill ph-truck text-xl"></i></div>
+                            </div>
+                        </div>
+                        <div onclick="filterSurat('Surat Keterangan Jual Beli (Umum)')" class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-purple-500 cursor-pointer hover:bg-purple-50 transform hover:-translate-y-1 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div><p class="text-sm font-medium text-gray-500">JB Umum</p><p class="text-2xl font-bold text-gray-800 mt-2" id="stat-jb-umum">0</p></div>
+                                <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600"><i class="ph-fill ph-shopping-cart text-xl"></i></div>
+                            </div>
+                        </div>
+                        <div onclick="filterSurat('Surat Keterangan Tanah')" class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-amber-500 cursor-pointer hover:bg-amber-50 transform hover:-translate-y-1 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div><p class="text-sm font-medium text-gray-500">SK Tanah</p><p class="text-2xl font-bold text-gray-800 mt-2" id="stat-tanah">0</p></div>
+                                <div class="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-amber-600"><i class="ph-fill ph-map-trifold text-xl"></i></div>
+                            </div>
+                        </div>
+                        <div onclick="filterSurat('Surat Keterangan Jual Beli Tanah')" class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-indigo-500 cursor-pointer hover:bg-indigo-50 transform hover:-translate-y-1 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div><p class="text-sm font-medium text-gray-500">JB Tanah</p><p class="text-2xl font-bold text-gray-800 mt-2" id="stat-jb-tanah">0</p></div>
+                                <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600"><i class="ph-fill ph-handshake text-xl"></i></div>
+                            </div>
+                        </div>
+                        <div onclick="filterSurat('Surat Rekomendasi Kartu Keluarga')" class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-pink-500 cursor-pointer hover:bg-pink-50 transform hover:-translate-y-1 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div><p class="text-sm font-medium text-gray-500">Rekom KK</p><p class="text-2xl font-bold text-gray-800 mt-2" id="stat-kk">0</p></div>
+                                <div class="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center text-pink-600"><i class="ph-fill ph-users-three text-xl"></i></div>
+                            </div>
+                        </div>
+                        <div onclick="filterSurat('Surat Keterangan Pengantar SKCK')" class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-teal-500 cursor-pointer hover:bg-teal-50 transform hover:-translate-y-1 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div><p class="text-sm font-medium text-gray-500">Peng. SKCK</p><p class="text-2xl font-bold text-gray-800 mt-2" id="stat-skck">0</p></div>
+                                <div class="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center text-teal-600"><i class="ph-fill ph-police-car text-xl"></i></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div id="view-form" class="view-section hidden max-w-4xl mx-auto space-y-4">
-                <button onclick="goBackToData()" class="flex items-center text-gray-600 hover:text-indigo-700 font-bold transition bg-white px-5 py-2.5 rounded-xl shadow-sm border border-gray-200">
-                    <i class="fa-solid fa-arrow-left mr-2"></i> Kembali ke Daftar
-                </button>
-
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                    <div class="bg-indigo-600 p-6 md:p-8 text-white">
-                        <h3 class="text-2xl font-bold" id="form-title">Tambah Surat Baru</h3>
-                    </div>
-                    
-                    <div class="p-6 md:p-8">
-                        <form id="surat-form" onsubmit="saveData(event)">
+                <div id="view-surat" class="view-section hidden space-y-6">
+                    <div id="form-container" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold" id="form-title">Buat Surat Baru</h3>
+                            <button onclick="toggleForm()" id="btn-toggle-form" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Tutup Form</button>
+                        </div>
+                        <form id="surat-form" class="space-y-4">
                             <input type="hidden" id="surat-id">
                             
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div class="space-y-6">
-                                    <div class="space-y-5 bg-gray-50 p-5 rounded-xl border border-gray-100">
-                                        <h4 class="font-bold text-indigo-800 text-sm uppercase tracking-widest border-b border-indigo-100 pb-2">Informasi Umum</h4>
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-700 mb-1">Nomor Urut / Agenda <span class="text-red-500">*</span></label>
-                                            <input type="text" id="nomor_urut" required class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition shadow-sm">
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-700 mb-1">Nomor Surat (Asli) <span class="text-red-500">*</span></label>
-                                            <input type="text" id="nomor_surat" required class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition shadow-sm">
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-semibold text-gray-700 mb-1">Tanggal Surat <span class="text-red-500">*</span></label>
-                                            <input type="date" id="tanggal_surat" required class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition shadow-sm">
-                                        </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Jenis Surat</label>
+                                    <select id="jenis_surat" required onchange="renderDynamicFields()" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        <option value="">-- Pilih Jenis Surat --</option>
+                                        <option value="Surat Keterangan Usaha (SKU)">Surat Keterangan Usaha (SKU)</option>
+                                        <option value="Surat Keterangan Tidak Mampu (SKTM)">Surat Keterangan Tidak Mampu (SKTM)</option>
+                                        <option value="Surat Keterangan Pindah Domisili">Surat Keterangan Pindah Domisili</option>
+                                        <option value="Surat Keterangan Kematian">Surat Keterangan Kematian</option>
+                                        <option value="Surat Keterangan Jual Beli (Umum)">Surat Keterangan Jual Beli (Umum)</option>
+                                        <option value="Surat Keterangan Tanah">Surat Keterangan Tanah</option>
+                                        <option value="Surat Keterangan Jual Beli Tanah">Surat Keterangan Jual Beli Tanah</option>
+                                        <option value="Surat Rekomendasi Kartu Keluarga">Surat Rekomendasi Kartu Keluarga</option>
+                                        <option value="Surat Keterangan Pengantar SKCK">Surat Keterangan Pengantar SKCK</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">NIK Pemohon</label>
+                                    <input type="text" id="nik" required pattern="[0-9]{16}" title="NIK harus 16 digit angka" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Nama Lengkap</label>
+                                    <input type="text" id="nama" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Tempat Lahir</label>
+                                        <input type="text" id="tempat_lahir" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Tgl Lahir</label>
+                                        <input type="date" id="tgl_lahir" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                     </div>
                                 </div>
-
-                                <div class="space-y-6">
-                                    <div class="space-y-5 bg-gray-50 p-5 rounded-xl border border-gray-100">
-                                        <h4 class="font-bold text-indigo-800 text-sm uppercase tracking-widest border-b border-indigo-100 pb-2">Detail Konten</h4>
-                                        
-                                        <!-- Field Surat Masuk -->
-                                        <div id="form-group-masuk" class="space-y-5">
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-1">Instansi / Pengirim <span class="text-red-500">*</span></label>
-                                                <input type="text" id="pengirim" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition shadow-sm">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-1">Perihal / Hal <span class="text-red-500">*</span></label>
-                                                <textarea id="perihal_masuk" rows="3" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition shadow-sm"></textarea>
-                                            </div>
-                                        </div>
-
-                                        <!-- Field Surat Keluar -->
-                                        <div id="form-group-keluar" class="space-y-5 hidden">
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-1">Jenis Surat <span class="text-red-500">*</span></label>
-                                                <input type="text" id="jenis_surat" placeholder="Misal: Surat Keputusan, Undangan" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition shadow-sm">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-1">Tujuan / Pemohon <span class="text-red-500">*</span></label>
-                                                <input type="text" id="pemohon" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition shadow-sm">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-semibold text-gray-700 mb-1">Isi Singkat <span class="text-red-500">*</span></label>
-                                                <textarea id="isi_surat" rows="2" class="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition shadow-sm"></textarea>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div class="col-span-1 md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700">Alamat Lengkap</label>
+                                    <textarea id="alamat" rows="2" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
                                 </div>
                             </div>
 
-                            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <!-- Kotak Upload Foto -->
-                                <div class="bg-blue-50 border-2 border-dashed border-blue-300 rounded-xl p-6 text-center hover:bg-blue-100 transition duration-300 relative">
-                                    <label class="block text-sm font-bold text-blue-900 mb-2 cursor-pointer">
-                                        <i class="fa-solid fa-camera text-3xl mb-2 text-blue-600 block"></i>
-                                        Ambil / Unggah Foto (Maks. 50MB)
-                                        <input type="file" id="bukti_foto" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="displayFileName(this, 'foto')">
-                                    </label>
-                                    <p class="text-xs text-blue-600">Tekan untuk membuka Kamera/Galeri</p>
-                                </div>
+                            <div id="dynamic-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hidden"></div>
 
-                                <!-- Kotak Upload PDF -->
-                                <div class="bg-red-50 border-2 border-dashed border-red-300 rounded-xl p-6 text-center hover:bg-red-100 transition duration-300 relative">
-                                    <label class="block text-sm font-bold text-red-900 mb-2 cursor-pointer">
-                                        <i class="fa-solid fa-file-pdf text-3xl mb-2 text-red-600 block"></i>
-                                        Unggah Berkas PDF (Maks. 50MB)
-                                        <input type="file" id="bukti_pdf" accept="application/pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="displayFileName(this, 'pdf')">
-                                    </label>
-                                    <p class="text-xs text-red-600">Tekan untuk memilih file .pdf</p>
+                            <div class="flex justify-end pt-4 border-t border-gray-100">
+                                <button type="button" onclick="clearForm()" class="mr-3 px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none">
+                                    Reset
+                                </button>
+                                <button type="submit" class="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
+                                    Simpan Data
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                        <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-xl">
+                            <div class="flex items-center space-x-3">
+                                <h3 class="text-lg font-semibold text-gray-800">Daftar Surat</h3>
+                                <div id="filter-badge" class="hidden items-center px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                                    <span id="filter-text"></span>
+                                    <button onclick="filterSurat('')" class="ml-2 text-blue-600 hover:text-blue-900"><i class="ph ph-x-circle text-sm mt-0.5"></i></button>
+                                </div>
+                            </div>
+                            <button id="btn-show-form" onclick="showNewForm()" class="px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 flex items-center hidden">
+                                <i class="ph ph-plus mr-1"></i> Tambah Baru
+                            </button>
+                        </div>
+                        <div class="p-4 overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIK / Nama</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis Surat</th>
+                                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-body" class="bg-white divide-y divide-gray-200"></tbody>
+                            </table>
+                            <div id="empty-state" class="hidden text-center py-10 text-gray-500">Belum ada data surat.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-akun" class="view-section hidden space-y-6">
+                     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <h3 class="text-lg font-semibold mb-4" id="form-akun-title">Tambah Akun Baru</h3>
+                        <form id="akun-form" class="space-y-4 max-w-lg">
+                            <input type="hidden" id="edit-akun-id">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Nama Lengkap Pengguna</label>
+                                <input type="text" id="new-nama-lengkap" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Username</label>
+                                <input type="text" id="new-username" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Password <span class="text-xs text-gray-400 font-normal">(Kosongkan jika tidak diubah)</span></label>
+                                <input type="text" id="new-password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Role</label>
+                                <select id="new-role" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                                    <option value="anggota">Anggota (Hanya Lihat & Cetak)</option>
+                                    <option value="admin">Administrator (Akses Penuh)</option>
+                                </select>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button type="submit" id="btn-save-akun" class="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Simpan Akun</button>
+                                <button type="button" onclick="resetAkunForm()" id="btn-cancel-akun" class="hidden px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Batal</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="p-4 border-b border-gray-100 bg-gray-50"><h3 class="text-lg font-semibold text-gray-800">Daftar Pengguna Sistem</h3></div>
+                        <div class="p-4 overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Lengkap</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Password</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="akun-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-pengaturan" class="view-section hidden space-y-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <h3 class="text-lg font-semibold mb-4">Pengaturan Dokumen & Cetak</h3>
+                        <form id="pengaturan-form" class="space-y-6 max-w-3xl">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Logo Kop Surat</label>
+                                    <div class="flex flex-col space-y-2">
+                                        <div class="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
+                                            <img id="preview-logo" src="" class="hidden max-h-full max-w-full object-contain">
+                                            <i id="preview-icon-logo" class="ph ph-image text-3xl text-gray-400"></i>
+                                        </div>
+                                        <input type="file" id="input-logo" accept="image/*" class="text-xs text-gray-500">
+                                        <button type="button" onclick="clearImageSetting('logo')" class="text-red-500 text-xs text-left">Hapus Logo</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Gambar Stempel Desa</label>
+                                    <div class="flex flex-col space-y-2">
+                                        <div class="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
+                                            <img id="preview-stempel" src="" class="hidden max-h-full max-w-full object-contain">
+                                            <i id="preview-icon-stempel" class="ph ph-stamp text-3xl text-gray-400"></i>
+                                        </div>
+                                        <input type="file" id="input-stempel" accept="image/*" class="text-xs text-gray-500">
+                                        <button type="button" onclick="clearImageSetting('stempel')" class="text-red-500 text-xs text-left">Hapus Stempel</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Gambar Tanda Tangan</label>
+                                    <div class="flex flex-col space-y-2">
+                                        <div class="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
+                                            <img id="preview-ttd_img" src="" class="hidden max-h-full max-w-full object-contain">
+                                            <i id="preview-icon-ttd_img" class="ph ph-pen-nib text-3xl text-gray-400"></i>
+                                        </div>
+                                        <input type="file" id="input-ttd_img" accept="image/*" class="text-xs text-gray-500">
+                                        <button type="button" onclick="clearImageSetting('ttd_img')" class="text-red-500 text-xs text-left">Hapus TTD</button>
+                                    </div>
                                 </div>
                             </div>
                             
-                            <div id="file-name-display" class="mt-4 flex flex-col items-center justify-center gap-2 p-3 bg-white rounded-lg shadow-sm border border-green-200 text-sm hidden max-w-sm mx-auto relative z-10">
-                                <div class="flex items-center w-full justify-center gap-2">
-                                    <i class="fa-solid fa-file-circle-check text-green-600 text-lg"></i>
-                                    <span id="file-name-text" class="text-green-800 font-bold truncate"></span>
-                                    <button type="button" onclick="removeExistingFile()" class="ml-2 bg-red-100 text-red-600 hover:bg-red-200 p-1.5 rounded-md transition" title="Hapus File"><i class="fa-solid fa-trash"></i></button>
+                            <div class="border-t pt-4 border-gray-100">
+                                <h4 class="text-md font-medium text-gray-800 mb-3">Teks Tanda Tangan</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Tipe Tanda Tangan</label>
+                                        <select id="ttd-type" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                                            <option value="KADES">Kepala Desa (Langsung)</option>
+                                            <option value="AN_KADES">a.n Kepala Desa (Diwakilkan)</option>
+                                        </select>
+                                    </div>
+                                    <div id="div-jabatan" class="hidden">
+                                        <label class="block text-sm font-medium text-gray-700">Jabatan Pewakil</label>
+                                        <input type="text" id="ttd-jabatan" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                                    </div>
+                                    <div class="col-span-1 md:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700">Nama Pejabat</label>
+                                        <input type="text" id="ttd-name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                                    </div>
+                                    <div class="col-span-1 md:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700">Spasi Tanda Tangan (px)</label>
+                                        <input type="number" id="ttd-spacing" required min="10" max="800" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Contoh: 150">
+                                        <p class="text-xs text-gray-500 mt-1">Atur jarak kosong vertikal secara manual (dalam pixel) antara jabatan dan nama pejabat untuk memberikan ruang tanda tangan/stempel basah.</p>
+                                    </div>
                                 </div>
-                                <!-- Menambahkan Pratinjau Foto Disini -->
-                                <img id="image-preview" src="" class="hidden mt-2 max-h-40 object-contain rounded-lg border border-gray-200 shadow-sm" alt="Preview Foto">
                             </div>
-                            <input type="hidden" id="existing_bukti">
-                            <input type="hidden" id="existing_bukti_name">
-
-                            <div class="mt-8 flex justify-end gap-4">
-                                <button type="submit" id="btn-save" class="w-full md:w-auto px-8 py-3.5 text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg hover:shadow-xl transition flex items-center justify-center gap-2">
-                                    <i class="fa-solid fa-save"></i> Simpan Data
-                                </button>
+                            
+                            <div class="border-t pt-4 border-gray-100">
+                                <h4 class="text-md font-medium text-gray-800 mb-3">Pengaturan Wilayah</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Kabupaten</label>
+                                        <input type="text" id="set-kabupaten" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Kecamatan</label>
+                                        <input type="text" id="set-kecamatan" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Desa</label>
+                                        <input type="text" id="set-desa" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                                    </div>
+                                    <div class="col-span-1 md:col-span-3 mt-2">
+                                        <label class="block text-sm font-medium text-gray-700">Alamat Lengkap (Kop Surat)</label>
+                                        <input type="text" id="set-alamat-kop" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Contoh: Jl. Desa Fajar Asri Kecamatan Panca Jaya Kabupaten Mesuji">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-end pt-4 border-t border-gray-100">
+                                <button type="submit" class="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Simpan Pengaturan</button>
                             </div>
                         </form>
                     </div>
                 </div>
             </div>
         </main>
-        
-        <div id="loading-overlay" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-[60] hidden flex-col items-center justify-center">
-            <div class="loader mb-4 border-indigo-600"></div>
-            <h3 class="text-xl font-bold text-indigo-900" id="loading-text">Memproses...</h3>
+    </div>
+
+    <!-- PREVIEW MODAL -->
+    <div id="preview-modal" class="fixed inset-0 z-50 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden p-4">
+        <div class="bg-gray-200 rounded-lg shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col">
+            <div class="p-4 bg-white rounded-t-lg flex justify-between items-center border-b">
+                <h3 class="text-lg font-bold">Pratinjau Dokumen</h3>
+                <div class="space-x-2">
+                    <button onclick="downloadPDF()" class="px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100"><i class="ph ph-file-pdf"></i> Download PDF</button>
+                    <button onclick="executePrint()" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"><i class="ph ph-printer"></i> Cetak Langsung</button>
+                    <button onclick="closePreview()" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300">Tutup</button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-auto p-4 bg-gray-200 flex justify-center relative">
+                <div id="print-wrapper" class="transform scale-90 sm:scale-100 origin-top shadow-lg"></div>
+            </div>
+            <div class="p-2 bg-blue-50 border-t border-blue-100 text-xs text-blue-700 text-center">
+                <i class="ph ph-info mr-1"></i> Anda dapat <b>menggeser</b>, menarik sudut kanan bawah, atau menggunakan <b>scroll mouse</b> pada Stempel & Tanda Tangan untuk menyesuaikan ukuran dan posisinya.
+            </div>
         </div>
     </div>
 
-    <!-- Modal Konfirmasi Hapus Kustom (Mengganti window.confirm) -->
-    <div id="confirm-modal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 transform scale-95 transition-transform duration-300" id="confirm-modal-content">
-            <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
-                <i class="fa-solid fa-triangle-exclamation text-red-600 text-xl"></i>
-            </div>
-            <h3 class="text-lg font-bold text-center text-gray-900 mb-2">Konfirmasi Hapus</h3>
-            <p class="text-sm text-gray-500 text-center mb-6" id="confirm-modal-text">Apakah Anda yakin?</p>
-            <div class="flex gap-3">
-                <button id="confirm-btn-cancel" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2.5 rounded-xl transition">Batal</button>
-                <button id="confirm-btn-ok" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-xl transition">Hapus</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="toast" class="fixed top-5 right-5 transform translate-x-full opacity-0 transition-all duration-300 bg-white shadow-2xl border-l-4 rounded-xl p-4 z-[80] flex items-center min-w-[320px]">
-        <div id="toast-icon" class="mr-4 text-2xl"></div>
-        <div>
-            <h4 id="toast-title" class="font-bold text-gray-900">Notifikasi</h4>
-            <p id="toast-message" class="text-sm text-gray-600 font-medium"></p>
-        </div>
-    </div>
+    <div id="print-area" class="print-only"></div>
 
     <script>
-        // ==========================================
-        // KONFIGURASI URL GOOGLE APPS SCRIPT (GAS)
-        // ==========================================
-        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbye2fHGnuMgbTyB_8dAaJMExDLsVpbZZ_KerO8p6V5HV4fiE3J4n0shI8yHg607U29P/exec"; 
-        const isGasConfigured = GAS_WEB_APP_URL !== "ISI_DENGAN_URL_WEB_APP_GAS_ANDA_DISINI" && GAS_WEB_APP_URL.trim() !== "";
-        
-        // Batas ukuran file 50MB
-        const MAX_FILE_SIZE = 50 * 1024 * 1024;
-        
-        window.currentTab = 'dashboard';
-        window.letters = []; 
-        window.selectedYear = 'all'; 
-        window.selectedMonth = 'all'; 
-        let dashboardChart = null;
-        let isOnline = navigator.onLine;
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxey0-HUoHNIAR6Lz9mr9tS-aFv9alc5Arm0CRzo4AsT389XnzFnwL0cdElC2t3e70J/exec"; 
 
-        const offlineQueue = localforage.createInstance({ name: "ESurat_Queue" });
-        const localCache = localforage.createInstance({ name: "ESurat_Cache" });
-
-        // Fungsi Kustom Konfirmasi Modal
-        let currentConfirmCallback = null;
-        window.showConfirmModal = (text, callback) => {
-            document.getElementById('confirm-modal-text').innerText = text;
-            currentConfirmCallback = callback;
-            const modal = document.getElementById('confirm-modal');
-            const content = document.getElementById('confirm-modal-content');
-            modal.classList.remove('hidden');
-            setTimeout(() => content.classList.replace('scale-95', 'scale-100'), 10);
-        };
+        let currentUser = null;
+        let suratData = [];
+        let usersData = [{ id: 1, username: 'admin', password: 'admin', role: 'admin', namaLengkap: 'Administrator Utama' }];
+        let isFormOpen = true;
+        let currentFilter = "";
         
-        window.hideConfirmModal = () => {
-            const modal = document.getElementById('confirm-modal');
-            const content = document.getElementById('confirm-modal-content');
-            content.classList.replace('scale-100', 'scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                currentConfirmCallback = null;
-            }, 300);
+        let appSettings = { 
+            logoBase64: '', stempelBase64: '', ttdImgBase64: '',
+            ttd_pos: { x: 50, y: 70 }, stempel_pos: { x: 20, y: 60 },
+            ttd_size: 220, stempel_size: 180,
+            ttd_type: 'KADES', ttd_jabatan: 'Sekretaris Desa', ttd_name: 'BAPAK KADES, S.Sos', 
+            ttd_spacing: 150,
+            kabupaten: 'MESUJI ATAS', kecamatan: 'PANC JAYA TENGAH', desa: 'FAJAR ASRI',
+            alamatKop: 'Jl. Raya Pembangunan No. 123, Kode Pos 12345'
         };
 
-        document.getElementById('confirm-btn-cancel').addEventListener('click', hideConfirmModal);
-        document.getElementById('confirm-btn-ok').addEventListener('click', () => {
-            if (currentConfirmCallback) currentConfirmCallback();
-            hideConfirmModal();
+        document.addEventListener('DOMContentLoaded', () => {
+            initAuth();
+            if (currentUser) initApp();
         });
 
-        async function initApp() {
-            setupNetworkListeners();
-            updateConnectionUI(isOnline);
-            updateQueueBadge();
-            
-            const cached = await localCache.getItem('letters');
-            if(cached) {
-                window.letters = cached;
-                updateYearDropdown();
-                refreshUI();
+        function initAuth() {
+            const remembered = localStorage.getItem('simades_remember');
+            if(remembered) {
+                const creds = JSON.parse(remembered);
+                document.getElementById('username').value = creds.username;
+                document.getElementById('password').value = creds.password;
+                document.getElementById('remember-me').checked = true;
             }
-
-            if(isOnline) {
-                await processOfflineQueue();
-                fetchDataFromServer();
+            const savedUser = sessionStorage.getItem('simades_session') || localStorage.getItem('simades_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('app-layout').classList.remove('hidden');
+            } else {
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('app-layout').classList.add('hidden');
             }
         }
 
-        async function fetchDataFromServer() {
-            if (!isOnline || !isGasConfigured) return;
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const remember = document.getElementById('remember-me').checked;
             
-            try {
-                document.getElementById('connection-status').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sinkronisasi...';
-                
-                const response = await fetch(GAS_WEB_APP_URL + "?action=read");
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    window.letters = result.data.sort((a, b) => new Date(b.tanggal_surat) - new Date(a.tanggal_surat));
-                    localCache.setItem('letters', window.letters);
-                    updateYearDropdown();
-                    refreshUI();
-                    updateConnectionUI(true, 'Terhubung & Sinkron');
+            const savedUsers = localStorage.getItem('simades_users');
+            if(savedUsers) usersData = JSON.parse(savedUsers);
+
+            const user = usersData.find(x => x.username === u && x.password === p);
+            if (user) {
+                currentUser = { username: user.username, role: user.role, namaLengkap: user.namaLengkap || user.username };
+                sessionStorage.setItem('simades_session', JSON.stringify(currentUser));
+                if(remember) {
+                    localStorage.setItem('simades_remember', JSON.stringify({username: u, password: p}));
+                    localStorage.setItem('simades_user', JSON.stringify(currentUser));
                 } else {
-                    throw new Error(result.message);
+                    localStorage.removeItem('simades_remember');
+                    localStorage.removeItem('simades_user');
                 }
-            } catch (error) {
-                console.error("Gagal mengambil data:", error);
-                updateConnectionUI(true, 'Gagal Sinkron');
+                Swal.fire({ title: 'Berhasil Login', icon: 'success', timer: 1000, showConfirmButton: false });
+                setTimeout(() => {
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('app-layout').classList.remove('hidden');
+                    initApp();
+                }, 1000);
+            } else {
+                Swal.fire('Gagal Login', 'Username atau password salah', 'error');
             }
+        });
+
+        function logout() {
+            Swal.fire({
+                title: 'Konfirmasi Keluar', text: "Anda yakin ingin keluar?", icon: 'warning',
+                showCancelButton: true, confirmButtonText: 'Ya, Keluar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    sessionStorage.removeItem('simades_session');
+                    localStorage.removeItem('simades_user');
+                    currentUser = null;
+                    document.getElementById('app-layout').classList.add('hidden');
+                    document.getElementById('login-screen').classList.remove('hidden');
+                }
+            });
         }
 
-        async function processOfflineQueue() {
-            if (!isOnline || !isGasConfigured) return;
+        function initApp() {
+            document.getElementById('user-name-display').innerText = currentUser.namaLengkap || currentUser.username;
+            document.getElementById('user-role-display').innerText = currentUser.role === 'admin' ? 'Administrator' : 'Anggota';
+            document.getElementById('user-avatar').innerText = (currentUser.namaLengkap || currentUser.username).charAt(0).toUpperCase();
             
-            const keys = await offlineQueue.keys();
-            if (keys.length === 0) return;
+            if (currentUser.role !== 'admin') {
+                document.getElementById('menu-akun').classList.add('hidden');
+                document.getElementById('menu-pengaturan').classList.add('hidden');
+                document.getElementById('form-container').classList.add('hidden');
+                document.getElementById('btn-show-form').classList.add('hidden');
+                isFormOpen = false;
+            } else {
+                document.getElementById('menu-akun').classList.remove('hidden');
+                document.getElementById('menu-pengaturan').classList.remove('hidden');
+                document.getElementById('btn-show-form').classList.remove('hidden');
+            }
+            loadSettings();
+            loadData();
+            switchView('dashboard');
+        }
 
-            document.getElementById('connection-status').innerHTML = '<i class="fa-solid fa-cloud-arrow-up fa-bounce"></i> Mengunggah Antrean...';
-            let successCount = 0;
+        function switchView(viewName) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('bg-gray-700', 'text-white', 'border-l-4', 'border-blue-500');
+                if (el.dataset.target === viewName) el.classList.add('bg-gray-700', 'text-white', 'border-l-4', 'border-blue-500');
+            });
+            const titles = { 'dashboard': 'Dashboard', 'surat': 'Data Surat Keterangan', 'akun': 'Kelola Akun Sistem', 'pengaturan': 'Pengaturan Sistem' };
+            document.getElementById('page-title').innerText = titles[viewName];
+            if(viewName === 'akun') renderAkunTable();
+        }
 
-            for (let key of keys) {
+        async function loadData() {
+            const localData = localStorage.getItem('simades_data');
+            if (localData) suratData = JSON.parse(localData);
+            updateDashboardStats();
+            renderTable();
+
+            if (GAS_WEB_APP_URL && GAS_WEB_APP_URL !== "YOUR_URL_HERE") {
                 try {
-                    const queueData = await offlineQueue.getItem(key);
-                    const response = await fetch(GAS_WEB_APP_URL, {
-                        method: 'POST',
-                        body: JSON.stringify(queueData)
-                    });
+                    Swal.fire({ title: 'Sinkronisasi Data...', text: 'Mengambil data dari server', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                    const response = await fetch(`${GAS_WEB_APP_URL}?action=get`);
                     const result = await response.json();
-                    
-                    if (result.status === 'success') {
-                        await offlineQueue.removeItem(key);
-                        successCount++;
+                    if(result.status === 'success') {
+                        suratData = result.data;
+                        localStorage.setItem('simades_data', JSON.stringify(suratData));
+                        if(result.settings && Object.keys(result.settings).length > 0) {
+                            appSettings = { ...appSettings, ...result.settings };
+                            if(typeof appSettings.stempel_pos === 'string') appSettings.stempel_pos = JSON.parse(appSettings.stempel_pos);
+                            if(typeof appSettings.ttd_pos === 'string') appSettings.ttd_pos = JSON.parse(appSettings.ttd_pos);
+                            localStorage.setItem('simades_settings', JSON.stringify(appSettings));
+                            loadSettings(); 
+                        }
+                        if(result.users && result.users.length > 0) {
+                            usersData = result.users;
+                            localStorage.setItem('simades_users', JSON.stringify(usersData));
+                        }
+                        updateDashboardStats();
+                        renderTable();
+                        if(!document.getElementById('view-akun').classList.contains('hidden')) renderAkunTable();
+                        updateSyncStatus(true);
+                        Swal.close();
                     }
                 } catch (error) {
-                    console.error("Gagal sinkron data ID:", key, error);
+                    updateSyncStatus(false);
+                    Swal.fire('Gagal Sinkronisasi', 'Tidak dapat menghubungi server. Menggunakan data lokal.', 'warning');
                 }
-            }
-
-            if (successCount > 0) {
-                showToast('success', `${successCount} data offline berhasil disinkronkan!`);
-                fetchDataFromServer();
-            }
-            updateQueueBadge();
-            updateConnectionUI(true, 'Terhubung & Sinkron');
-        }
-
-        function updateYearDropdown() {
-            const select = document.getElementById('year-filter');
-            const currentVal = select.value;
-            
-            // Generate tahun statis dari 2023 sampai 2032
-            let html = '<option value="all">Semua Tahun</option>';
-            for (let y = 2023; y <= 2032; y++) {
-                html += `<option value="${y}">${y}</option>`;
-            }
-            
-            select.innerHTML = html;
-            
-            if (currentVal !== 'all' && select.querySelector(`option[value="${currentVal}"]`)) {
-                select.value = currentVal;
             } else {
-                select.value = 'all';
-                window.selectedYear = 'all';
+                updateSyncStatus(false);
             }
         }
 
-        window.changeYear = (val) => {
-            window.selectedYear = val;
-            refreshUI();
-        };
-
-        window.changeMonth = (val) => {
-            window.selectedMonth = val;
-            refreshUI();
-        };
-
-        function getFilteredDataForTab(tab) {
-            let data = window.letters.filter(l => l.jenis === tab);
-            
-            if (window.selectedYear !== 'all') {
-                data = data.filter(l => l.tanggal_surat && new Date(l.tanggal_surat).getFullYear().toString() === window.selectedYear);
-            }
-            
-            if (window.selectedMonth !== 'all') {
-                data = data.filter(l => {
-                    if (!l.tanggal_surat) return false;
-                    const month = (new Date(l.tanggal_surat).getMonth() + 1).toString().padStart(2, '0');
-                    return month === window.selectedMonth;
-                });
-            }
-            
-            return data;
-        }
-
-        async function updateQueueBadge() {
-            const keys = await offlineQueue.keys();
-            const badge = document.getElementById('queue-badge');
-            const countEl = document.getElementById('queue-count');
-            if (keys.length > 0) {
-                countEl.innerText = keys.length;
-                badge.classList.remove('hidden');
-                badge.classList.add('flex');
-            } else {
-                badge.classList.add('hidden');
-                badge.classList.remove('flex');
-            }
-        }
-
-        window.forceSync = async () => {
-            if(!isOnline) {
-                showToast('error', 'Tidak ada koneksi internet.');
+        async function syncData() {
+            if(!GAS_WEB_APP_URL || GAS_WEB_APP_URL === "YOUR_URL_HERE") {
+                Swal.fire('Info', 'URL Google Apps Script belum dikonfigurasi.', 'info');
                 return;
             }
-            await processOfflineQueue();
-            fetchDataFromServer();
-        };
+            await loadData();
+        }
 
-        function updateChart(masukCount, keluarCount) {
-            const ctx = document.getElementById('suratChart');
-            const emptyText = document.getElementById('chart-empty-text');
-            if (!ctx) return;
+        function updateSyncStatus(isSuccess) {
+            const el = document.getElementById('sync-status');
+            el.innerHTML = isSuccess ? `<i class="ph-fill ph-cloud-check text-green-500 mr-1 text-lg"></i> Tersinkronisasi` : `<i class="ph-fill ph-cloud-warning text-red-500 mr-1 text-lg"></i> Offline/Lokal`;
+        }
 
-            if (masukCount === 0 && keluarCount === 0) {
-                emptyText.classList.remove('hidden');
-                if (dashboardChart) { dashboardChart.destroy(); dashboardChart = null; }
+        function updateDashboardStats() {
+            document.getElementById('stat-total').innerText = suratData.length;
+            document.getElementById('stat-sku').innerText = suratData.filter(s => s.jenis_surat === 'Surat Keterangan Usaha (SKU)').length;
+            document.getElementById('stat-sktm').innerText = suratData.filter(s => s.jenis_surat === 'Surat Keterangan Tidak Mampu (SKTM)').length;
+            document.getElementById('stat-kematian').innerText = suratData.filter(s => s.jenis_surat === 'Surat Keterangan Kematian').length;
+            document.getElementById('stat-jb-umum').innerText = suratData.filter(s => s.jenis_surat === 'Surat Keterangan Jual Beli (Umum)').length;
+            document.getElementById('stat-tanah').innerText = suratData.filter(s => s.jenis_surat === 'Surat Keterangan Tanah').length;
+            document.getElementById('stat-jb-tanah').innerText = suratData.filter(s => s.jenis_surat === 'Surat Keterangan Jual Beli Tanah').length;
+            document.getElementById('stat-kk').innerText = suratData.filter(s => s.jenis_surat === 'Surat Rekomendasi Kartu Keluarga').length;
+            document.getElementById('stat-skck').innerText = suratData.filter(s => s.jenis_surat === 'Surat Keterangan Pengantar SKCK').length;
+            document.getElementById('stat-pindah').innerText = suratData.filter(s => s.jenis_surat === 'Surat Keterangan Pindah Domisili').length;
+        }
+
+        function filterSurat(type) {
+            currentFilter = type;
+            switchView('surat');
+            renderTable();
+            
+            if(isFormOpen && !document.getElementById('surat-id').value) {
+                clearForm();
+            }
+        }
+
+        function toggleForm() {
+            if(currentUser.role !== 'admin') return;
+            const container = document.getElementById('form-container');
+            const btnShow = document.getElementById('btn-show-form');
+            if (isFormOpen) {
+                container.classList.add('hidden');
+                btnShow.classList.remove('hidden');
+            } else {
+                container.classList.remove('hidden');
+                btnShow.classList.add('hidden');
+            }
+            isFormOpen = !isFormOpen;
+        }
+
+        function showNewForm() {
+            clearForm();
+            if (!isFormOpen) toggleForm();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function renderDynamicFields() {
+            const jenis = document.getElementById('jenis_surat').value;
+            const container = document.getElementById('dynamic-fields');
+            container.innerHTML = '';
+            if(!jenis) { container.classList.add('hidden'); return; }
+            container.classList.remove('hidden');
+            
+            let fieldsHTML = `
+                <div class="col-span-1 md:col-span-2 mb-2 pb-2 border-b border-gray-200">
+                    <label class="block text-sm font-medium text-gray-700">Nomor Surat</label>
+                    <input type="text" id="df_nomor_surat" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm sm:text-sm" placeholder="Contoh: 470 / 001 / PEM-DS / 2026">
+                </div>
+            `;
+
+            if(jenis === 'Surat Keterangan Pindah Domisili') {
+                fieldsHTML += `
+                    <div class="col-span-1 md:col-span-2 text-sm font-bold text-gray-700 mt-2">Data Tambahan Pemohon:</div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Nomor KK</label>
+                        <input type="text" id="df_no_kk" required pattern="[0-9]{16}" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Agama</label>
+                        <select id="df_agama" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                            <option value="Islam">Islam</option><option value="Kristen">Kristen</option><option value="Katolik">Katolik</option>
+                            <option value="Hindu">Hindu</option><option value="Buddha">Buddha</option><option value="Konghucu">Konghucu</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Status Perkawinan</label>
+                        <select id="df_status_perkawinan" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                            <option value="Belum Kawin">Belum Kawin</option><option value="Kawin">Kawin</option>
+                            <option value="Cerai Hidup">Cerai Hidup</option><option value="Cerai Mati">Cerai Mati</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Pendidikan Terakhir</label>
+                        <input type="text" id="df_pendidikan" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Contoh: SMA / S1">
+                    </div>
+                    <div class="col-span-1 md:col-span-2 text-sm font-bold text-gray-700 mt-2">Detail Kepindahan:</div>
+                    <div class="col-span-1 md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700">Alamat Tujuan Pindah</label>
+                        <textarea id="df_alamat_tujuan" rows="2" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
+                    </div>
+                    <div class="col-span-1 md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700">Alasan Pindah</label>
+                        <input type="text" id="df_alasan_pindah" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Contoh: Ikut Keluarga">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Tanggal Rencana Pindah</label>
+                        <input type="date" id="df_tgl_pindah" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Jumlah Keluarga/Pengikut</label>
+                        <input type="number" id="df_jumlah_pengikut" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="0">
+                    </div>
+                `;
+            } else if(jenis === 'Surat Keterangan Usaha (SKU)') {
+                fieldsHTML += `
+                    <div><label class="block text-sm font-medium text-gray-700">Nama Usaha</label><input type="text" id="df_nama_usaha" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Jenis/Bidang Usaha</label><input type="text" id="df_bidang_usaha" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                `;
+            } else if(jenis === 'Surat Keterangan Tidak Mampu (SKTM)') {
+                fieldsHTML += `
+                    <div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700">Tujuan/Keperluan</label><input type="text" id="df_keperluan" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                `;
+            } else if(jenis === 'Surat Keterangan Kematian') {
+                fieldsHTML += `
+                    <div><label class="block text-sm font-medium text-gray-700">Tanggal Meninggal</label><input type="date" id="df_tgl_meninggal" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Penyebab Kematian</label><input type="text" id="df_penyebab" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                `;
+            } else if(jenis === 'Surat Keterangan Tanah' || jenis === 'Surat Keterangan Jual Beli Tanah') {
+                let extraPembeli = '';
+                if(jenis === 'Surat Keterangan Jual Beli Tanah') {
+                    extraPembeli = `
+                        <div class="col-span-1 md:col-span-2 text-sm font-bold text-gray-700 mt-2">Data Pembeli:</div>
+                        <div><label class="block text-sm font-medium text-gray-700">Nama Pembeli</label><input type="text" id="df_nama_pembeli" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                        <div><label class="block text-sm font-medium text-gray-700">NIK Pembeli</label><input type="text" id="df_nik_pembeli" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                        <div><label class="block text-sm font-medium text-gray-700">Luas Tanah (m²)</label><input type="text" id="df_luas_tanah" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                        <div><label class="block text-sm font-medium text-gray-700">Total Harga (Rp)</label><input type="text" id="df_total_harga" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                    `;
+                }
+                fieldsHTML += extraPembeli + `
+                    <div class="col-span-1 md:col-span-2 text-sm font-bold text-gray-700 mt-2">Batas-batas Tanah:</div>
+                    <div><label class="block text-sm font-medium text-gray-700">Sebelah Utara</label><input type="text" id="df_batas_utara" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Sebelah Timur</label><input type="text" id="df_batas_timur" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Sebelah Selatan</label><input type="text" id="df_batas_selatan" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Sebelah Barat</label><input type="text" id="df_batas_barat" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                `;
+            } else {
+                fieldsHTML += `
+                    <div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700">Keterangan / Detail</label><textarea id="df_keterangan" rows="2" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"></textarea></div>
+                `;
+            }
+            container.innerHTML = fieldsHTML;
+        }
+
+        function clearForm() {
+            document.getElementById('surat-form').reset();
+            document.getElementById('surat-id').value = '';
+            document.getElementById('form-title').innerText = 'Buat Surat Baru';
+            
+            if (currentFilter) {
+                document.getElementById('jenis_surat').value = currentFilter;
+                renderDynamicFields();
+            } else {
+                document.getElementById('dynamic-fields').innerHTML = '';
+                document.getElementById('dynamic-fields').classList.add('hidden');
+            }
+        }
+
+        document.getElementById('surat-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if(currentUser.role !== 'admin') {
+                Swal.fire('Akses Ditolak', 'Hanya admin yang dapat menyimpan data.', 'error');
                 return;
             }
-            emptyText.classList.add('hidden');
 
-            const data = {
-                labels: ['Surat Masuk', 'Surat Keluar'],
-                datasets: [{
-                    data: [masukCount, keluarCount],
-                    backgroundColor: ['#3b82f6', '#22c55e'],
-                    borderWidth: 0, hoverOffset: 4
-                }]
+            const id = document.getElementById('surat-id').value || Date.now().toString();
+            const isEdit = !!document.getElementById('surat-id').value;
+            
+            const extraDataObj = {};
+            document.querySelectorAll('#dynamic-fields input, #dynamic-fields textarea, #dynamic-fields select').forEach(el => {
+                extraDataObj[el.id.replace('df_', '')] = el.value;
+            });
+
+            const payload = {
+                id: id,
+                tanggal: new Date().toISOString().split('T')[0],
+                jenis_surat: document.getElementById('jenis_surat').value,
+                nik: document.getElementById('nik').value,
+                nama: document.getElementById('nama').value,
+                tempat_lahir: document.getElementById('tempat_lahir').value,
+                tgl_lahir: document.getElementById('tgl_lahir').value,
+                alamat: document.getElementById('alamat').value,
+                extra_data: JSON.stringify(extraDataObj)
             };
 
-            const config = {
-                type: 'doughnut', data: data,
-                options: {
-                    responsive: true, cutout: '70%',
-                    plugins: { legend: { position: 'bottom' } }
-                }
-            };
-
-            if (dashboardChart) dashboardChart.destroy();
-            dashboardChart = new Chart(ctx, config);
-        }
-
-        function refreshUI() {
-            const masukData = getFilteredDataForTab('masuk');
-            const keluarData = getFilteredDataForTab('keluar');
-            
-            const masukCount = masukData.length;
-            const keluarCount = keluarData.length;
-            
-            document.getElementById('count-masuk').innerText = masukCount;
-            document.getElementById('count-keluar').innerText = keluarCount;
-            
-            updateChart(masukCount, keluarCount);
-            
-            if (window.currentTab !== 'dashboard' && document.getElementById('view-form').classList.contains('hidden')) {
-                renderTable();
+            if(isEdit) {
+                const idx = suratData.findIndex(s => String(s.id) === String(id));
+                if(idx > -1) suratData[idx] = payload;
+            } else {
+                suratData.unshift(payload);
             }
-        }
-
-        window.editData = (id) => { openForm(id); };
+            localStorage.setItem('simades_data', JSON.stringify(suratData));
+            
+            renderTable();
+            updateDashboardStats();
+            clearForm();
+            
+            if (GAS_WEB_APP_URL && GAS_WEB_APP_URL !== "YOUR_URL_HERE") {
+                try {
+                    await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: isEdit ? 'update' : 'add', data: payload })
+                    });
+                } catch(e) {}
+            }
+            Swal.fire({title: 'Tersimpan!', text: 'Data surat berhasil disimpan', icon: 'success', timer: 1500, showConfirmButton: false});
+        });
 
         function renderTable() {
             const tbody = document.getElementById('table-body');
             const emptyState = document.getElementById('empty-state');
+            const filterBadge = document.getElementById('filter-badge');
+            const filterText = document.getElementById('filter-text');
             tbody.innerHTML = '';
             
-            const filteredData = getFilteredDataForTab(window.currentTab);
-            
-            // Mengurutkan data berdasarkan Nomor Urut (menaik: 1, 2, 3...)
-            filteredData.sort((a, b) => {
-                const valA = a.nomor_urut ? a.nomor_urut.toString() : '';
-                const valB = b.nomor_urut ? b.nomor_urut.toString() : '';
-                // localeCompare numeric=true memastikan "2" diletakkan sebelum "10"
-                return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
-            });
-            
-            if (filteredData.length === 0) {
-                emptyState.classList.remove('hidden');
-                document.getElementById('data-table').classList.add('hidden');
+            let displayData = suratData;
+            if (currentFilter !== "") {
+                displayData = suratData.filter(s => s.jenis_surat === currentFilter);
+                filterText.innerText = `Melihat: ${currentFilter}`;
+                filterBadge.classList.replace('hidden', 'flex');
             } else {
-                emptyState.classList.add('hidden');
-                document.getElementById('data-table').classList.remove('hidden');
+                filterBadge.classList.replace('flex', 'hidden');
+            }
+            
+            if(displayData.length === 0) { emptyState.classList.remove('hidden'); return; }
+            emptyState.classList.add('hidden');
+
+            displayData.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "cursor-pointer hover:bg-gray-50 transition-colors";
+                tr.onclick = (e) => { if(!e.target.closest('button')) previewSurat(item.id); };
                 
-                const isMasuk = window.currentTab === 'masuk';
-                filteredData.forEach((item) => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-indigo-50/40 transition-colors border-b border-gray-100';
-                    
-                    let buktiHtml = '<span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-md font-medium">Kosong</span>';
-                    if (item.bukti_dukung) {
-                        if (item.bukti_dukung.startsWith('http')) {
-                            buktiHtml = `<a href="${item.bukti_dukung}" target="_blank" class="text-blue-700 hover:text-white hover:bg-blue-600 text-xs font-bold flex items-center justify-center gap-1.5 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 transition-colors mx-auto w-max">Buka Drive</a>`;
-                        } else {
-                            buktiHtml = `<button onclick="viewPDFBase64('${item.id}')" class="text-red-700 hover:text-white hover:bg-red-600 text-xs font-bold flex items-center justify-center gap-1.5 bg-red-50 px-3 py-2 rounded-lg border border-red-200 mx-auto w-max">Lihat File</button>`;
-                        }
-                    }
-
-                    const displayDate = item.tanggal_surat ? new Date(item.tanggal_surat).toLocaleDateString('id-ID') : '-';
-                    let middleCols = isMasuk ? 
-                        `<td class="p-4 font-bold text-gray-800">${item.pengirim || '-'}</td><td class="p-4">${item.perihal || '-'}</td>` : 
-                        `<td class="p-4 font-bold text-gray-800">${item.pemohon || '-'}</td><td class="p-4">${item.jenis_surat || '-'}: ${item.isi_surat || '-'}</td>`;
-
-                    tr.innerHTML = `
-                        <td class="p-4"><span class="bg-gray-800 text-white px-3 py-1.5 rounded-lg text-sm">${item.nomor_urut || '-'}</span></td>
-                        <td class="p-4"><div class="font-bold text-indigo-700">${item.nomor_surat}</div><div class="text-xs text-gray-500 mt-1">${displayDate}</div></td>
-                        ${middleCols}
-                        <td class="p-4 text-center">${buktiHtml}</td>
-                        <td class="p-4 text-center no-print">
-                            <div class="flex justify-center gap-2">
-                                <button onclick="editData('${item.id}')" class="text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white w-9 h-9 rounded-lg border border-indigo-100 flex items-center justify-center"><i class="fa-solid fa-pen text-sm"></i></button>
-                                <button onclick="deleteData('${item.id}')" class="text-red-600 bg-red-50 hover:bg-red-600 hover:text-white w-9 h-9 rounded-lg border border-red-100 flex items-center justify-center"><i class="fa-solid fa-trash text-sm"></i></button>
-                            </div>
-                        </td>
+                let actionButtons = `
+                    <button onclick="previewSurat('${item.id}')" class="text-blue-600 hover:text-blue-900 mx-1 p-1" title="Pratinjau"><i class="ph ph-eye text-lg pointer-events-none"></i></button>
+                    <button onclick="printSuratDirect('${item.id}')" class="text-gray-600 hover:text-gray-900 mx-1 p-1" title="Cetak"><i class="ph ph-printer text-lg pointer-events-none"></i></button>
+                    <button onclick="downloadPDFDirect('${item.id}')" class="text-green-600 hover:text-green-900 mx-1 p-1" title="Download PDF"><i class="ph ph-file-pdf text-lg pointer-events-none"></i></button>
+                `;
+                if (currentUser.role === 'admin') {
+                    actionButtons = `
+                        <button onclick="editSurat('${item.id}')" class="text-yellow-600 hover:text-yellow-900 mx-1 p-1" title="Edit"><i class="ph ph-pencil-simple text-lg pointer-events-none"></i></button>
+                        ${actionButtons}
+                        <button onclick="deleteSurat('${item.id}')" class="text-red-600 hover:text-red-900 mx-1 p-1" title="Hapus"><i class="ph ph-trash text-lg pointer-events-none"></i></button>
                     `;
-                    tbody.appendChild(tr);
-                });
+                }
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(item.tanggal)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">${item.nama}</div>
+                        <div class="text-sm text-gray-500">${item.nik}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">${item.jenis_surat}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onclick="event.stopPropagation()">${actionButtons}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function editSurat(id) {
+            if(currentUser.role !== 'admin') return;
+            const item = suratData.find(s => String(s.id) === String(id));
+            if(!item) return;
+            if(!isFormOpen) toggleForm();
+            
+            document.getElementById('form-title').innerText = 'Edit Surat';
+            document.getElementById('surat-id').value = item.id;
+            document.getElementById('jenis_surat').value = item.jenis_surat;
+            document.getElementById('nik').value = item.nik;
+            document.getElementById('nama').value = item.nama;
+            document.getElementById('tempat_lahir').value = item.tempat_lahir;
+            document.getElementById('tgl_lahir').value = item.tgl_lahir;
+            document.getElementById('alamat').value = item.alamat;
+            
+            renderDynamicFields();
+            const extraDataObj = JSON.parse(item.extra_data || '{}');
+            for(let key in extraDataObj) {
+                const el = document.getElementById(`df_${key}`);
+                if(el) el.value = extraDataObj[key];
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function deleteSurat(id) {
+            if(currentUser.role !== 'admin') return;
+            Swal.fire({
+                title: 'Hapus Data?', text: "Data ini tidak dapat dikembalikan!", icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Ya, hapus!'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    suratData = suratData.filter(s => String(s.id) !== String(id));
+                    localStorage.setItem('simades_data', JSON.stringify(suratData));
+                    renderTable();
+                    updateDashboardStats();
+                    if (GAS_WEB_APP_URL && GAS_WEB_APP_URL !== "YOUR_URL_HERE") {
+                        try { fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: id }) }); } catch(e) {}
+                    }
+                    Swal.fire('Terhapus!', 'Data telah dihapus.', 'success');
+                }
+            });
+        }
+
+        let currentPrintId = null;
+
+        function buildHTMLSurat(item) {
+            const extra = JSON.parse(item.extra_data || '{}');
+            const kab = appSettings.kabupaten || 'MESUJI ATAS';
+            const kec = appSettings.kecamatan || 'PANC JAYA TENGAH';
+            const desa = appSettings.desa || 'FAJAR ASRI';
+            const alamatKop = appSettings.alamatKop || 'Jl. Raya Pembangunan No. 123, Kode Pos 12345';
+            const nomorSurat = extra.nomor_surat || `470 / ${Math.floor(Math.random()*1000)} / PEM-DS / ${new Date().getFullYear()}`;
+            
+            let logoHtml = appSettings.logoBase64 ? `<img src="${appSettings.logoBase64}" class="kop-surat-logo">` : '';
+            
+            let html = `
+                <div class="a4-paper" id="pdf-export-wrapper">
+                <div class="kop-surat">
+                    ${logoHtml}
+                    <div class="kop-surat-text">
+                        <h1>PEMERINTAH KABUPATEN ${kab.toUpperCase()}</h1>
+                        <h2>KECAMATAN ${kec.toUpperCase()}</h2>
+                        <h3>DESA ${desa.toUpperCase()}</h3>
+                        <p>${alamatKop}</p>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-bottom: 8px;">
+                    <h3 style="margin:0; text-transform: uppercase; text-decoration: underline; font-size: 12pt;">${item.jenis_surat}</h3>
+                    <p style="margin:0; font-size: 9pt;">Nomor: ${nomorSurat}</p>
+                </div>
+                <div class="isi-surat">
+                    <p>Yang bertanda tangan di bawah ini Kepala Desa ${desa}, Kecamatan ${kec}, Kabupaten ${kab}, menerangkan dengan sebenarnya bahwa:</p>
+                    <table style="width: 100%; margin: 3px 0; margin-left: 20px;">
+                        <tr><td style="width: 150px;">Nama Lengkap</td><td style="width: 10px;">:</td><td><b>${item.nama}</b></td></tr>
+                        <tr><td>NIK</td><td>:</td><td>${item.nik}</td></tr>
+                        <tr><td>Tempat, Tgl Lahir</td><td>:</td><td>${item.tempat_lahir}, ${formatDate(item.tgl_lahir)}</td></tr>
+                        <tr><td style="vertical-align: top;">Alamat</td><td style="vertical-align: top;">:</td><td>${item.alamat}</td></tr>
+                    </table>
+            `;
+
+            if (item.jenis_surat.includes('Pindah Domisili')) {
+                html += `
+                    <p>Adapun data tambahan yang bersangkutan adalah sebagai berikut:</p>
+                    <table style="width: 100%; margin: 3px 0; margin-left: 20px;">
+                        <tr><td style="width: 150px;">Nomor KK</td><td style="width: 10px;">:</td><td>${extra.no_kk || '-'}</td></tr>
+                        <tr><td>Agama</td><td>:</td><td>${extra.agama || '-'}</td></tr>
+                        <tr><td>Status Perkawinan</td><td>:</td><td>${extra.status_perkawinan || '-'}</td></tr>
+                        <tr><td>Pendidikan</td><td>:</td><td>${extra.pendidikan || '-'}</td></tr>
+                    </table>
+                    <p>Sesuai dengan pengajuan yang bersangkutan, menerangkan bahwa orang tersebut benar-benar penduduk Desa ${desa} yang akan pindah domisili ke alamat baru:</p>
+                    <table style="width: 100%; margin: 3px 0; margin-left: 20px;">
+                        <tr><td style="width: 150px; vertical-align: top;">Alamat Tujuan</td><td style="width: 10px; vertical-align: top;">:</td><td><b>${extra.alamat_tujuan || '-'}</b></td></tr>
+                        <tr><td>Alasan Pindah</td><td>:</td><td>${extra.alasan_pindah || '-'}</td></tr>
+                        <tr><td>Tanggal Pindah</td><td>:</td><td>${formatDate(extra.tgl_pindah) || '-'}</td></tr>
+                        <tr><td>Jumlah Pengikut</td><td>:</td><td>${extra.jumlah_pengikut || '0'} Orang</td></tr>
+                    </table>
+                    <p>Adapun surat keterangan ini dibuat sebagai pengantar atau syarat administrasi kepindahan kependudukan.</p>
+                `;
+            } else if (item.jenis_surat.includes('Usaha')) {
+                html += `
+                    <p>Orang tersebut di atas benar adalah penduduk Desa ${desa} dan saat ini memiliki usaha:</p>
+                    <table style="width: 100%; margin: 3px 0; margin-left: 20px;">
+                        <tr><td style="width: 150px;">Nama Usaha</td><td style="width: 10px;">:</td><td>${extra.nama_usaha || '-'}</td></tr>
+                        <tr><td>Bidang Usaha</td><td>:</td><td>${extra.bidang_usaha || '-'}</td></tr>
+                    </table>
+                `;
+            } else if (item.jenis_surat.includes('Kematian')) {
+                html += `
+                    <p>Telah melaporkan bahwa telah meninggal dunia seorang warga:</p>
+                    <table style="width: 100%; margin: 3px 0; margin-left: 20px;">
+                        <tr><td style="width: 150px;">Tanggal Meninggal</td><td style="width: 10px;">:</td><td>${formatDate(extra.tgl_meninggal) || '-'}</td></tr>
+                        <tr><td>Penyebab</td><td>:</td><td>${extra.penyebab || '-'}</td></tr>
+                    </table>
+                `;
+            } else if (item.jenis_surat.includes('Tidak Mampu')) {
+                 html += `
+                    <p>Berdasarkan catatan kami, yang bersangkutan benar-benar tergolong keluarga <b>Tidak Mampu (Pra Sejahtera)</b>.</p>
+                    <p>Surat ini diterbitkan untuk keperluan: <b>${extra.keperluan || '-'}</b>.</p>
+                `;
+            } else if (item.jenis_surat.includes('Tanah')) {
+                let pembeliHtml = '';
+                if(item.jenis_surat === 'Surat Keterangan Jual Beli Tanah') {
+                     pembeliHtml = `
+                        <p>Bahwa yang bersangkutan di atas benar telah melakukan jual beli sebidang tanah dengan:</p>
+                        <table style="width: 100%; margin: 3px 0; margin-left: 20px;">
+                            <tr><td style="width: 150px;">Nama Pembeli</td><td style="width: 10px;">:</td><td><b>${extra.nama_pembeli || '-'}</b></td></tr>
+                            <tr><td>NIK Pembeli</td><td>:</td><td>${extra.nik_pembeli || '-'}</td></tr>
+                            <tr><td>Luas Tanah</td><td>:</td><td>${extra.luas_tanah || '-'} m²</td></tr>
+                            <tr><td>Total Harga</td><td>:</td><td>Rp ${extra.total_harga || '-'}</td></tr>
+                        </table>
+                     `;
+                } else { pembeliHtml = `<p>Bahwa yang bersangkutan benar memiliki sebidang tanah di wilayah Desa ${desa}.</p>`; }
+                html += `
+                    ${pembeliHtml}
+                    <p>Adapun sebidang tanah tersebut memiliki batas-batas sebagai berikut:</p>
+                    <table style="width: 100%; margin: 3px 0; margin-left: 20px;">
+                        <tr><td style="width: 150px;">Sebelah Utara</td><td style="width: 10px;">:</td><td>Berbatasan dengan ${extra.batas_utara || '-'}</td></tr>
+                        <tr><td>Sebelah Timur</td><td>:</td><td>Berbatasan dengan ${extra.batas_timur || '-'}</td></tr>
+                        <tr><td>Sebelah Selatan</td><td>:</td><td>Berbatasan dengan ${extra.batas_selatan || '-'}</td></tr>
+                        <tr><td>Sebelah Barat</td><td>:</td><td>Berbatasan dengan ${extra.batas_barat || '-'}</td></tr>
+                    </table>
+                `;
+            } else {
+                html += `<p>Menyatakan bahwa: <br> ${extra.keterangan || 'Tidak ada keterangan spesifik.'}</p>`;
+            }
+
+            let ttdHtml = appSettings.ttd_type === 'AN_KADES' ? `
+                <p>a.n Kepala Desa ${desa}</p>
+                <p>${appSettings.ttd_jabatan}</p>
+                <p class="ttd-name" style="margin-top: ${appSettings.ttd_spacing || 150}px;">${appSettings.ttd_name}</p>
+            ` : `
+                <p>Kepala Desa ${desa}</p>
+                <p class="ttd-name" style="margin-top: ${appSettings.ttd_spacing || 150}px;">${appSettings.ttd_name}</p>
+            `;
+
+            let stempelEl = appSettings.stempelBase64 ? 
+                `<div id="drag-stempel" class="draggable-element" style="left: ${appSettings.stempel_pos.x}%; top: ${appSettings.stempel_pos.y}%; width: ${appSettings.stempel_size || 180}px; height: ${appSettings.stempel_size || 180}px;">
+                    <img src="${appSettings.stempelBase64}">
+                </div>` : '';
+                
+            let ttdImgEl = appSettings.ttdImgBase64 ? 
+                `<div id="drag-ttd" class="draggable-element" style="left: ${appSettings.ttd_pos.x}%; top: ${appSettings.ttd_pos.y}%; width: ${appSettings.ttd_size || 220}px; height: ${appSettings.ttd_size || 220}px;">
+                    <img src="${appSettings.ttdImgBase64}">
+                </div>` : '';
+
+            html += `
+                    <p>Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.</p>
+                </div>
+                <div class="ttd-area">
+                    <p style="margin-bottom: 3px;">${desa}, ${formatDate(new Date().toISOString().split('T')[0])}</p>
+                    ${ttdHtml}
+                </div>
+                ${stempelEl}
+                ${ttdImgEl}
+                <div style="clear:both;"></div>
+                </div>
+            `;
+            return html;
+        }
+
+        function previewSurat(id) {
+            const item = suratData.find(s => String(s.id) === String(id));
+            if(!item) return;
+            currentPrintId = id;
+            
+            document.getElementById('print-wrapper').innerHTML = buildHTMLSurat(item);
+            document.getElementById('preview-modal').classList.remove('hidden');
+
+            if(currentUser.role === 'admin') {
+                makeDraggable(document.getElementById('drag-stempel'), 'stempel_pos');
+                makeDraggable(document.getElementById('drag-ttd'), 'ttd_pos');
+                makeResizable(document.getElementById('drag-stempel'), 'stempel_size');
+                makeResizable(document.getElementById('drag-ttd'), 'ttd_size');
             }
         }
 
-        window.saveData = async (e) => {
+        function closePreview() {
+            document.getElementById('preview-modal').classList.add('hidden');
+            currentPrintId = null;
+        }
+
+        let resizeSyncTimeout;
+        function makeResizable(element, settingKey) {
+            if (!element) return;
+            element.addEventListener('wheel', (e) => {
+                e.preventDefault(); 
+                let currentWidth = element.offsetWidth;
+                let delta = e.deltaY < 0 ? 15 : -15; 
+                let newWidth = Math.max(50, Math.min(currentWidth + delta, 400));
+                element.style.width = newWidth + 'px';
+                element.style.height = newWidth + 'px';
+            }, { passive: false });
+
+            const observer = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    if (entry.contentRect.width > 0) { 
+                        appSettings[settingKey] = Math.round(entry.contentRect.width);
+                        localStorage.setItem('simades_settings', JSON.stringify(appSettings));
+                        clearTimeout(resizeSyncTimeout);
+                        resizeSyncTimeout = setTimeout(saveSettingsToServerBackground, 1500);
+                    }
+                }
+            });
+            observer.observe(element);
+        }
+
+        function makeDraggable(element, settingKey) {
+            if (!element) return;
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            element.onmousedown = dragMouseDown;
+
+            function dragMouseDown(e) {
+                if(e.offsetX > element.offsetWidth - 15 && e.offsetY > element.offsetHeight - 15) return;
+                e = e || window.event; e.preventDefault();
+                pos3 = e.clientX; pos4 = e.clientY;
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e = e || window.event; e.preventDefault();
+                pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY;
+                pos3 = e.clientX; pos4 = e.clientY;
+                element.style.top = (element.offsetTop - pos2) + "px";
+                element.style.left = (element.offsetLeft - pos1) + "px";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null; document.onmousemove = null;
+                const parent = element.parentElement;
+                const xPercent = (element.offsetLeft / parent.offsetWidth) * 100;
+                const yPercent = (element.offsetTop / parent.offsetHeight) * 100;
+                appSettings[settingKey] = { x: xPercent, y: yPercent };
+                localStorage.setItem('simades_settings', JSON.stringify(appSettings));
+                saveSettingsToServerBackground();
+            }
+        }
+
+        function saveSettingsToServerBackground() {
+            if (GAS_WEB_APP_URL && GAS_WEB_APP_URL !== "YOUR_URL_HERE") {
+                fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action: 'saveSettings', settings: appSettings }) }).catch(e => {});
+            }
+        }
+
+        function printSuratDirect(id) {
+            const item = suratData.find(s => String(s.id) === String(id));
+            if(!item) return;
+            document.getElementById('print-area').innerHTML = buildHTMLSurat(item);
+            window.print();
+        }
+
+        function executePrint() {
+            if(!currentPrintId) return;
+            printSuratDirect(currentPrintId);
+        }
+
+        function downloadPDF() {
+            if(!currentPrintId) return;
+            const element = document.querySelector('#print-wrapper .a4-paper');
+            const item = suratData.find(s => String(s.id) === String(currentPrintId));
+            generatePDF(element, item);
+        }
+
+        function downloadPDFDirect(id) {
+            const item = suratData.find(s => String(s.id) === String(id));
+            if(!item) return;
+            const tempDiv = document.createElement('div');
+            tempDiv.style.position = 'absolute'; tempDiv.style.left = '-9999px';
+            tempDiv.innerHTML = buildHTMLSurat(item);
+            document.body.appendChild(tempDiv);
+            generatePDF(tempDiv.querySelector('.a4-paper'), item, tempDiv);
+        }
+
+        function generatePDF(element, item, tempDivToRemove = null) {
+            const opt = {
+                margin:       0,
+                filename:     `Surat_${item.jenis_surat.replace(/\s+/g, '_')}_${item.nik}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            Swal.fire({ title: 'Membuat PDF...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            html2pdf().set(opt).from(element).save().then(() => {
+                if(tempDivToRemove) document.body.removeChild(tempDivToRemove);
+                Swal.close();
+            });
+        }
+
+        function renderAkunTable() {
+            const tbody = document.getElementById('akun-table-body');
+            tbody.innerHTML = '';
+            const savedUsers = localStorage.getItem('simades_users');
+            if(savedUsers) usersData = JSON.parse(savedUsers);
+
+            usersData.forEach(u => {
+                const isDefaultAdmin = u.username === 'admin';
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">${u.namaLengkap || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${u.username}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span class="px-2 py-1 bg-gray-100 rounded text-xs font-mono">${u.password}</span></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">${u.role}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button onclick="editAkun(${u.id})" class="text-blue-600 hover:text-blue-900 mx-1 p-1" title="Edit"><i class="ph ph-pencil-simple text-lg"></i></button>
+                            ${!isDefaultAdmin ? `<button onclick="deleteAkun(${u.id})" class="text-red-600 hover:text-red-900 mx-1 p-1" title="Hapus"><i class="ph ph-trash text-lg"></i></button>` : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function resetAkunForm() {
+            document.getElementById('akun-form').reset();
+            document.getElementById('edit-akun-id').value = '';
+            document.getElementById('form-akun-title').innerText = 'Tambah Akun Baru';
+            document.getElementById('btn-save-akun').innerText = 'Simpan Akun';
+            document.getElementById('btn-cancel-akun').classList.add('hidden');
+        }
+
+        function editAkun(id) {
+            const user = usersData.find(u => String(u.id) === String(id));
+            if(!user) return;
+            document.getElementById('edit-akun-id').value = user.id;
+            document.getElementById('new-nama-lengkap').value = user.namaLengkap || '';
+            document.getElementById('new-username').value = user.username;
+            document.getElementById('new-password').value = '';
+            document.getElementById('new-role').value = user.role;
+            document.getElementById('form-akun-title').innerText = 'Edit Pengguna';
+            document.getElementById('btn-save-akun').innerText = 'Simpan Perubahan';
+            document.getElementById('btn-cancel-akun').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        document.getElementById('akun-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            const btnSave = document.getElementById('btn-save');
-            btnSave.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Menyimpan...';
-            btnSave.disabled = true;
-            
-            try {
-                const id = document.getElementById('surat-id').value || 'SRT-' + Date.now();
-                
-                // Mendeteksi kotak input mana yang diisi file
-                let fileInput = document.getElementById('bukti_foto');
-                if (!fileInput.files || fileInput.files.length === 0) {
-                    fileInput = document.getElementById('bukti_pdf');
-                }
-                
-                let base64File = document.getElementById('existing_bukti').value;
-                let fileName = document.getElementById('existing_bukti_name').value;
+            const editId = document.getElementById('edit-akun-id').value;
+            const nl = document.getElementById('new-nama-lengkap').value;
+            const u = document.getElementById('new-username').value;
+            const p = document.getElementById('new-password').value;
+            const r = document.getElementById('new-role').value;
 
-                if (fileInput.files.length > 0) {
-                    const file = fileInput.files[0];
-                    if (file.size > MAX_FILE_SIZE) throw new Error("File too large");
-                    base64File = await getBase64(file);
-                    fileName = file.name;
-                }
-
-                const isMasuk = window.currentTab === 'masuk';
-                const newData = {
-                    id: id, jenis: window.currentTab,
-                    nomor_urut: document.getElementById('nomor_urut').value,
-                    nomor_surat: document.getElementById('nomor_surat').value,
-                    tanggal_surat: document.getElementById('tanggal_surat').value,
-                    bukti_dukung: base64File, bukti_dukung_name: fileName,
-                    updated_at: new Date().toISOString()
-                };
-
-                if (isMasuk) {
-                    newData.pengirim = document.getElementById('pengirim').value;
-                    newData.perihal = document.getElementById('perihal_masuk').value;
-                } else {
-                    newData.jenis_surat = document.getElementById('jenis_surat').value;
-                    newData.isi_surat = document.getElementById('isi_surat').value;
-                    newData.pemohon = document.getElementById('pemohon').value;
-                }
-
-                // 1. UPDATE UI LOKAL SECARA LANGSUNG
-                const index = window.letters.findIndex(l => l.id === newData.id);
-                if (index !== -1) window.letters[index] = newData;
-                else window.letters.push(newData);
-                
-                window.letters.sort((a, b) => new Date(b.tanggal_surat) - new Date(a.tanggal_surat));
-                localCache.setItem('letters', window.letters);
-                updateYearDropdown(); 
-                refreshUI();
-
-                // 2. TENTUKAN AKSI ONLINE / OFFLINE
-                const payload = { action: 'create_or_update', data: newData };
-
-                if (isOnline && isGasConfigured) {
-                    const response = await fetch(GAS_WEB_APP_URL, {
-                        method: 'POST',
-                        body: JSON.stringify(payload)
-                    });
-                    const result = await response.json();
-                    
-                    if(result.status !== 'success') throw new Error(result.message);
-                    
-                    if(result.url) {
-                        const updatedIndex = window.letters.findIndex(l => l.id === newData.id);
-                        if (updatedIndex !== -1) {
-                            window.letters[updatedIndex].bukti_dukung = result.url;
-                            localCache.setItem('letters', window.letters);
-                            refreshUI();
-                        }
+            if (editId) {
+                const idx = usersData.findIndex(x => String(x.id) === String(editId));
+                if (idx > -1) {
+                    if (usersData[idx].username === 'admin' && u !== 'admin') {
+                        Swal.fire('Peringatan', 'Username admin default tidak boleh diubah!', 'warning'); return;
                     }
-                    showToast('success', 'Berhasil disimpan ke Google Sheets!');
-                } else {
-                    await offlineQueue.setItem('SAVE_' + newData.id, payload);
-                    updateQueueBadge();
-                    if (!isGasConfigured) {
-                        showToast('info', 'Mode Lokal: Tersimpan di perangkat karena URL GAS belum disetel.');
-                    } else {
-                        showToast('info', 'Tersimpan Offline. Akan dikirim saat koneksi kembali.');
-                    }
+                    usersData[idx].namaLengkap = nl;
+                    usersData[idx].username = u;
+                    if(p && p.trim() !== "") usersData[idx].password = p;
+                    usersData[idx].role = r;
+                    Swal.fire('Berhasil', 'Akun diperbarui', 'success');
                 }
-                
-                goBackToData();
-            } catch (error) {
-                console.error(error);
-                showToast('error', error.message === "File too large" ? 'Gagal: File melebihi batas 50MB' : 'Terjadi kesalahan saat memproses data.');
-            } finally {
-                btnSave.innerHTML = '<i class="fa-solid fa-save"></i> Simpan Data';
-                btnSave.disabled = false;
+            } else {
+                if (!p || p.trim() === "") { Swal.fire('Gagal', 'Password wajib diisi!', 'warning'); return; }
+                usersData.push({ id: Date.now(), username: u, password: p, role: r, namaLengkap: nl });
+                Swal.fire('Berhasil', 'Akun ditambahkan', 'success');
             }
-        };
+            localStorage.setItem('simades_users', JSON.stringify(usersData));
+            if (GAS_WEB_APP_URL && GAS_WEB_APP_URL !== "YOUR_URL_HERE") {
+                const savedUser = usersData.find(x => x.username === u);
+                fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action: 'saveUser', data: savedUser }) }).catch(e=>{});
+            }
+            resetAkunForm();
+            renderAkunTable();
+        });
 
-        // Menggunakan Custom Modal Konfirmasi
-        window.deleteData = (id) => {
-            showConfirmModal('Peringatan: Anda yakin ingin menghapus arsip surat ini secara permanen? Data yang dihapus tidak dapat dikembalikan.', async () => {
-                try {
-                    // 1. Hapus dari tampilan tabel lokal segera
-                    window.letters = window.letters.filter(l => l.id !== id);
-                    localCache.setItem('letters', window.letters);
-                    updateYearDropdown();
-                    refreshUI();
-
-                    const payload = { action: 'delete', id: id };
-
-                    if (isOnline && isGasConfigured) {
-                        document.getElementById('loading-text').innerText = 'Menghapus Data...';
-                        document.getElementById('loading-overlay').classList.replace('hidden', 'flex');
-                        
-                        await fetch(GAS_WEB_APP_URL, {
-                            method: 'POST',
-                            body: JSON.stringify(payload)
-                        });
-                        
-                        document.getElementById('loading-overlay').classList.replace('flex', 'hidden');
-                        document.getElementById('loading-text').innerText = 'Memproses...';
-                        showToast('success', 'Data surat berhasil dihapus dari Spreadsheet.');
-                    } else {
-                        await offlineQueue.setItem('DEL_' + id, payload);
-                        updateQueueBadge();
-                        if (!isGasConfigured) {
-                            showToast('info', 'Mode Lokal: Data dihapus dari perangkat.');
-                        } else {
-                            showToast('info', 'Penghapusan disimpan Offline. Akan disinkron ke server saat Online.');
-                        }
+        function deleteAkun(id) {
+            Swal.fire({
+                title: 'Hapus Akun?', text: "Anda yakin ingin menghapus akun ini?", icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Ya, hapus!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    usersData = usersData.filter(u => String(u.id) !== String(id));
+                    localStorage.setItem('simades_users', JSON.stringify(usersData));
+                    renderAkunTable();
+                    if (GAS_WEB_APP_URL && GAS_WEB_APP_URL !== "YOUR_URL_HERE") {
+                        fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteUser', id: id }) });
                     }
-                } catch(e) {
-                    document.getElementById('loading-overlay').classList.replace('flex', 'hidden');
-                    document.getElementById('loading-text').innerText = 'Memproses...';
-                    showToast('error', 'Terjadi kesalahan jaringan saat menghapus.');
-                    console.error("Gagal menghapus:", e);
+                    Swal.fire('Terhapus!', 'Akun berhasil dihapus.', 'success');
                 }
             });
-        };
+        }
 
-        window.switchTab = (tab) => {
-            window.currentTab = tab;
-            
-            // Otomatis sembunyikan sidebar di HP setelah menu dipilih
-            const s = document.getElementById('sidebar');
-            if (window.innerWidth < 768 && !s.classList.contains('hidden')) {
-                toggleSidebar();
-            }
+        function loadSettings() {
+            const saved = localStorage.getItem('simades_settings');
+            if(saved) appSettings = JSON.parse(saved);
+            applyImageSetting('logo', appSettings.logoBase64);
+            applyImageSetting('stempel', appSettings.stempelBase64);
+            applyImageSetting('ttd_img', appSettings.ttdImgBase64);
+            document.getElementById('ttd-type').value = appSettings.ttd_type || 'KADES';
+            document.getElementById('ttd-jabatan').value = appSettings.ttd_jabatan || '';
+            document.getElementById('ttd-name').value = appSettings.ttd_name || '';
+            document.getElementById('ttd-spacing').value = appSettings.ttd_spacing || 150;
+            document.getElementById('set-kabupaten').value = appSettings.kabupaten || 'MESUJI ATAS';
+            document.getElementById('set-kecamatan').value = appSettings.kecamatan || 'PANC JAYA TENGAH';
+            document.getElementById('set-desa').value = appSettings.desa || 'FAJAR ASRI';
+            document.getElementById('set-alamat-kop').value = appSettings.alamatKop || 'Jl. Raya Pembangunan No. 123, Kode Pos 12345';
+            toggleJabatanField();
+        }
 
-            ['dashboard', 'masuk', 'keluar'].forEach(t => {
-                const nav = document.getElementById(`nav-${t}`);
-                if(nav) nav.className = t === tab ? 'w-full text-left px-4 py-3 rounded-lg bg-indigo-900 border-l-4 border-white transition-colors flex items-center' : 'w-full text-left px-4 py-3 rounded-lg hover:bg-indigo-700 transition-colors flex items-center';
-            });
-
-            document.getElementById('view-form').classList.add('hidden');
-
-            if (tab === 'dashboard') {
-                document.getElementById('view-dashboard').classList.remove('hidden');
-                document.getElementById('view-data').classList.add('hidden');
-                document.getElementById('page-title').innerText = 'Dashboard Overview';
-            } else {
-                document.getElementById('view-dashboard').classList.add('hidden');
-                document.getElementById('view-data').classList.remove('hidden');
-                
-                const isMasuk = tab === 'masuk';
-                document.getElementById('page-title').innerText = isMasuk ? 'Arsip Surat Masuk' : 'Arsip Surat Keluar';
-                document.getElementById('table-title').innerText = isMasuk ? 'Daftar Surat Masuk' : 'Daftar Surat Keluar';
-                document.getElementById('table-head').innerHTML = isMasuk ? 
-                    `<tr class="bg-indigo-50 text-indigo-900 text-xs uppercase tracking-wider border-b border-indigo-100"><th class="p-4 font-bold">No. Urut</th><th class="p-4 font-bold">No. Surat & Tgl</th><th class="p-4 font-bold">Instansi Pengirim</th><th class="p-4 font-bold">Perihal</th><th class="p-4 font-bold text-center">Arsip PDF</th><th class="p-4 font-bold text-center no-print">Aksi</th></tr>` :
-                    `<tr class="bg-indigo-50 text-indigo-900 text-xs uppercase tracking-wider border-b border-indigo-100"><th class="p-4 font-bold">No. Urut</th><th class="p-4 font-bold">No. Surat & Tgl</th><th class="p-4 font-bold">Tujuan</th><th class="p-4 font-bold">Jenis & Isi</th><th class="p-4 font-bold text-center">Arsip PDF</th><th class="p-4 font-bold text-center no-print">Aksi</th></tr>`;
-                renderTable();
-            }
-        };
-
-        window.openForm = (id = null) => {
-            document.getElementById('view-data').classList.add('hidden');
-            document.getElementById('view-form').classList.remove('hidden');
-            document.getElementById('surat-form').reset();
-            removeExistingFile();
-            
-            const isMasuk = window.currentTab === 'masuk';
-            document.getElementById('form-group-masuk').classList.toggle('hidden', !isMasuk);
-            document.getElementById('form-group-keluar').classList.toggle('hidden', isMasuk);
-            
-            document.getElementById('pengirim').required = isMasuk;
-            document.getElementById('perihal_masuk').required = isMasuk;
-            document.getElementById('jenis_surat').required = !isMasuk;
-            document.getElementById('isi_surat').required = !isMasuk;
-            document.getElementById('pemohon').required = !isMasuk;
-
-            if (id) {
-                const item = window.letters.find(l => l.id === id);
-                if (item) {
-                    document.getElementById('surat-id').value = item.id;
-                    document.getElementById('nomor_urut').value = item.nomor_urut || '';
-                    document.getElementById('nomor_surat').value = item.nomor_surat || '';
-                    document.getElementById('tanggal_surat').value = item.tanggal_surat || '';
-                    if (isMasuk) {
-                        document.getElementById('pengirim').value = item.pengirim || '';
-                        document.getElementById('perihal_masuk').value = item.perihal || '';
-                    } else {
-                        document.getElementById('jenis_surat').value = item.jenis_surat || '';
-                        document.getElementById('isi_surat').value = item.isi_surat || '';
-                        document.getElementById('pemohon').value = item.pemohon || '';
-                    }
-                    if (item.bukti_dukung) {
-                        document.getElementById('existing_bukti').value = item.bukti_dukung;
-                        document.getElementById('file-name-text').innerText = item.bukti_dukung_name || 'Berkas Tersimpan';
-                        document.getElementById('file-name-display').classList.remove('hidden');
-                        
-                        // Tampilkan pratinjau jika yang disimpan sebelumnya adalah Gambar/Foto
-                        const preview = document.getElementById('image-preview');
-                        if (item.bukti_dukung.startsWith('data:image/') || (item.bukti_dukung_name && item.bukti_dukung_name.match(/\.(jpg|jpeg|png|gif)$/i))) {
-                            preview.src = item.bukti_dukung;
-                            preview.classList.remove('hidden');
-                        } else {
-                            preview.classList.add('hidden');
-                            preview.src = '';
-                        }
-                    }
-                }
-            } else {
-                document.getElementById('surat-id').value = '';
-                const currentData = getFilteredDataForTab(window.currentTab);
-                document.getElementById('nomor_urut').value = (currentData.length + 1).toString().padStart(3, '0');
-                
-                const today = new Date();
-                document.getElementById('tanggal_surat').value = today.toISOString().split('T')[0];
-            }
-        };
-
-        window.goBackToData = () => { document.getElementById('view-form').classList.add('hidden'); document.getElementById('view-data').classList.remove('hidden'); };
-        
-        window.toggleSidebar = () => { 
-            const s = document.getElementById('sidebar');
-            const backdrop = document.getElementById('sidebar-backdrop');
-            
-            if (window.innerWidth < 768) {
-                if (s.classList.contains('hidden')) {
-                    s.classList.remove('hidden');
-                    s.classList.add('fixed', 'inset-y-0', 'left-0');
-                    backdrop.classList.remove('hidden');
-                } else {
-                    s.classList.add('hidden');
-                    s.classList.remove('fixed', 'inset-y-0', 'left-0');
-                    backdrop.classList.add('hidden');
-                }
-            } else {
-                if (s.classList.contains('md:flex')) {
-                    s.classList.remove('md:flex');
-                } else {
-                    s.classList.add('md:flex');
+        function applyImageSetting(type, base64Data) {
+            const imgEl = document.getElementById(`preview-${type}`);
+            const iconEl = document.getElementById(`preview-icon-${type}`);
+            if(base64Data) {
+                imgEl.src = base64Data;
+                imgEl.classList.remove('hidden');
+                iconEl.classList.add('hidden');
+                if(type === 'logo') {
+                    const loginImg = document.getElementById('login-logo-img');
+                    const sidebarImg = document.getElementById('sidebar-logo-img');
+                    if(loginImg) { loginImg.src = base64Data; loginImg.classList.remove('hidden'); document.getElementById('login-icon').classList.add('hidden'); }
+                    if(sidebarImg) { sidebarImg.src = base64Data; sidebarImg.classList.remove('hidden'); document.getElementById('sidebar-icon').classList.add('hidden'); }
                 }
             }
-        };
-        
-        // Memperbarui fungsi untuk membuat pratinjau gambar terbaca secara real-time
-        window.displayFileName = (input, type) => { 
-            if(input.files[0]) { 
-                const file = input.files[0];
-                
-                // Hapus isi kotak yang berlawanan agar tidak bentrok
-                if(type === 'foto') {
-                    document.getElementById('bukti_pdf').value = '';
-                } else {
-                    document.getElementById('bukti_foto').value = '';
-                }
-                
-                document.getElementById('file-name-text').innerText = file.name; 
-                document.getElementById('file-name-display').classList.remove('hidden'); 
-                
-                const preview = document.getElementById('image-preview');
-                if (file.type.startsWith('image/')) {
+        }
+
+        function clearImageSetting(type) {
+            if(type === 'logo') appSettings.logoBase64 = '';
+            if(type === 'stempel') appSettings.stempelBase64 = '';
+            if(type === 'ttd_img') appSettings.ttdImgBase64 = '';
+            document.getElementById(`preview-${type}`).src = '';
+            document.getElementById(`preview-${type}`).classList.add('hidden');
+            document.getElementById(`preview-icon-${type}`).classList.remove('hidden');
+            document.getElementById(`input-${type}`).value = '';
+        }
+
+        ['logo', 'stempel', 'ttd_img'].forEach(type => {
+            document.getElementById(`input-${type}`).addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if(file) {
                     const reader = new FileReader();
-                    reader.onload = (e) => {
-                        preview.src = e.target.result;
-                        preview.classList.remove('hidden');
+                    reader.onload = function(event) {
+                        const b64 = event.target.result;
+                        if(type === 'logo') appSettings.logoBase64 = b64;
+                        if(type === 'stempel') appSettings.stempelBase64 = b64;
+                        if(type === 'ttd_img') appSettings.ttdImgBase64 = b64;
+                        applyImageSetting(type, b64);
                     };
                     reader.readAsDataURL(file);
-                } else {
-                    preview.classList.add('hidden');
-                    preview.src = '';
                 }
-            }
-        };
-        
-        window.removeExistingFile = () => { 
-            document.getElementById('existing_bukti').value = ''; 
-            document.getElementById('bukti_foto').value = ''; 
-            document.getElementById('bukti_pdf').value = ''; 
-            document.getElementById('file-name-display').classList.add('hidden'); 
-            
-            const preview = document.getElementById('image-preview');
-            preview.classList.add('hidden');
-            preview.src = '';
-        };
-        
-        function getBase64(file) { return new Promise((res, rej) => { const r = new FileReader(); r.readAsDataURL(file); r.onload = () => res(r.result); r.onerror = error => rej(error); }); }
-        
-        window.viewPDFBase64 = (id) => {
-            const item = window.letters.find(l => l.id === id);
-            if (item && item.bukti_dukung) {
-                const fileWindow = window.open("");
-                if (item.bukti_dukung.startsWith('data:image/')) {
-                    fileWindow.document.write(`<title>Lihat Berkas - ${item.nomor_surat}</title><body style="margin:0; background-color:#222; display:flex; justify-content:center; align-items:center; height:100vh;"><img src='${item.bukti_dukung}' style="max-width:100%; max-height:100%; object-fit:contain;" /></body>`);
-                } else {
-                    fileWindow.document.write(`<title>Lihat Berkas - ${item.nomor_surat}</title><body style="margin:0;"><iframe width='100%' height='100%' src='${item.bukti_dukung}' style="border:none;"></iframe></body>`);
-                }
-            }
-        };
-
-        window.showToast = (type, message) => {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-message').innerText = message;
-            toast.className = `fixed top-5 right-5 transform opacity-100 transition-all duration-300 bg-white shadow-2xl border-l-4 rounded-xl p-4 z-[80] flex items-center min-w-[320px] ${type==='success'?'border-green-500':type==='error'?'border-red-500':'border-blue-500'}`;
-            document.getElementById('toast-icon').innerHTML = type==='success'?'<i class="fa-solid fa-circle-check text-green-500"></i>':type==='error'?'<i class="fa-solid fa-triangle-exclamation text-red-500"></i>':'<i class="fa-solid fa-circle-info text-blue-500"></i>';
-            setTimeout(() => toast.classList.add('translate-x-full', 'opacity-0'), 3000);
-        };
-
-        function setupNetworkListeners() {
-            window.addEventListener('online', () => { 
-                isOnline = true; 
-                updateConnectionUI(true);
-                processOfflineQueue();
             });
-            window.addEventListener('offline', () => { 
-                isOnline = false; 
-                updateConnectionUI(false, "Mode Offline Aktif"); 
-            });
+        });
+
+        document.getElementById('ttd-type').addEventListener('change', toggleJabatanField);
+        function toggleJabatanField() {
+            const type = document.getElementById('ttd-type').value;
+            if(type === 'AN_KADES') document.getElementById('div-jabatan').classList.remove('hidden');
+            else document.getElementById('div-jabatan').classList.add('hidden');
         }
 
-        function updateConnectionUI(online, msg = '') {
-            const statusEl = document.getElementById('connection-status');
-            if (!isGasConfigured) {
-                statusEl.innerHTML = `<i class="fa-solid fa-server text-yellow-400"></i> Mode Lokal`;
-                return;
-            }
-            statusEl.innerHTML = online ? `<i class="fa-solid fa-cloud-check text-green-400"></i> ${msg || 'Online'}` : `<i class="fa-solid fa-wifi-slash text-yellow-400"></i> ${msg || 'Offline'}`;
+        document.getElementById('pengaturan-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            appSettings.ttd_type = document.getElementById('ttd-type').value;
+            appSettings.ttd_jabatan = document.getElementById('ttd-jabatan').value;
+            appSettings.ttd_name = document.getElementById('ttd-name').value;
+            appSettings.ttd_spacing = parseInt(document.getElementById('ttd-spacing').value) || 150;
+            appSettings.kabupaten = document.getElementById('set-kabupaten').value;
+            appSettings.kecamatan = document.getElementById('set-kecamatan').value;
+            appSettings.desa = document.getElementById('set-desa').value;
+            appSettings.alamatKop = document.getElementById('set-alamat-kop').value;
+            localStorage.setItem('simades_settings', JSON.stringify(appSettings));
+            saveSettingsToServerBackground();
+            Swal.fire({title: 'Tersimpan!', text: 'Pengaturan berhasil diperbarui', icon: 'success', timer: 1500, showConfirmButton: false});
+        });
+
+        function formatDate(dateString) {
+            if(!dateString) return '-';
+            return new Date(dateString).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
         }
-        
-        window.exportExcel = () => {
-            const dataToExport = getFilteredDataForTab(window.currentTab).map(l => {
-                let r = { 'No. Urut': l.nomor_urut, 'No Surat': l.nomor_surat, 'Tanggal': l.tanggal_surat };
-                if (window.currentTab === 'masuk') { r['Pengirim'] = l.pengirim; r['Perihal'] = l.perihal; } 
-                else { r['Tujuan'] = l.pemohon; r['Jenis'] = l.jenis_surat; r['Isi'] = l.isi_surat; }
-                return r;
-            });
-            
-            if(dataToExport.length === 0) return showToast('error', 'Tidak ada data untuk dieksport.');
-            
-            const ws = XLSX.utils.json_to_sheet(dataToExport); const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, `Data`); 
-            
-            let filename = `E-Surat_${window.currentTab}`;
-            if (window.selectedYear !== 'all') filename += `_${window.selectedYear}`;
-            XLSX.writeFile(wb, `${filename}.xlsx`);
-        };
-
-        window.exportPDF = () => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('l', 'mm', 'a4'); 
-            
-            doc.setFontSize(16);
-            let title = `Rekapitulasi Surat ${window.currentTab === 'masuk' ? 'Masuk' : 'Keluar'} - Desa Fajar Asri`;
-            if (window.selectedYear !== 'all') title += ` (Tahun ${window.selectedYear})`;
-            doc.text(title, 14, 20);
-            
-            const head = window.currentTab === 'masuk' 
-                ? [['No. Urut', 'Nomor Surat', 'Tanggal', 'Instansi / Pengirim', 'Perihal']]
-                : [['No. Urut', 'Nomor Surat', 'Tanggal', 'Jenis Surat', 'Isi Surat', 'Tujuan / Pemohon']];
-
-            const dataToExport = getFilteredDataForTab(window.currentTab).map(l => {
-                const tgl = l.tanggal_surat ? new Date(l.tanggal_surat).toLocaleDateString('id-ID') : '-';
-                if (window.currentTab === 'masuk') {
-                    return [l.nomor_urut || '-', l.nomor_surat || '-', tgl, l.pengirim || '-', l.perihal || '-'];
-                }
-                return [l.nomor_urut || '-', l.nomor_surat || '-', tgl, l.jenis_surat || '-', l.isi_surat || '-', l.pemohon || '-'];
-            });
-
-            if(dataToExport.length === 0) {
-                showToast('error', 'Tidak ada data untuk di-download.');
-                return;
-            }
-
-            doc.autoTable({ 
-                head: head, 
-                body: dataToExport, 
-                startY: 30, 
-                headStyles: { fillColor: [79, 70, 229] }, 
-                styles: { fontSize: 10, cellPadding: 3 }
-            });
-            
-            let filename = `E-Surat_${window.currentTab}`;
-            if (window.selectedYear !== 'all') filename += `_${window.selectedYear}`;
-            else filename += `_${new Date().toISOString().slice(0,10)}`;
-            
-            doc.save(`${filename}.pdf`);
-        };
-
-        initApp();
     </script>
 </body>
 </html>
